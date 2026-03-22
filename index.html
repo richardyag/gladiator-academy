@@ -290,43 +290,49 @@
     .feedback-bubble.correct-fb .feedback-text { color: #7dffaa; }
     .feedback-bubble.wrong-fb .feedback-text { color: #ff8888; }
 
-    /* ===================== LEVEL 2 SPECIAL ===================== */
-    .letter-display {
-      display: flex; flex-direction: column; align-items: center;
-      justify-content: center; gap: 8px; padding: 8px;
+    /* ===================== DOTS (visual numbers) ===================== */
+    .dots-grid {
+      display: flex; flex-wrap: wrap; gap: 4px;
+      justify-content: center; max-width: 110px; padding: 4px;
     }
-    .big-letter {
-      font-size: clamp(60px, 18vw, 90px); font-weight: bold;
-      color: var(--gold); line-height: 1;
-      text-shadow: 0 0 30px rgba(212,168,83,0.4), 2px 2px 0 #000;
-      background: rgba(212,168,83,0.08);
-      border: 2px solid rgba(212,168,83,0.3);
-      border-radius: 16px; padding: 10px 24px;
-    }
-    .letter-shield-label { font-size: 12px; color: #c8a060; letter-spacing: 2px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 
-    .word-display {
-      display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;
-      padding: 8px;
+    /* ===================== LEVEL 1 - COMPARE ===================== */
+    .answer-btn.compare-btn {
+      flex-direction: column; gap: 8px; min-height: 100px;
+      align-items: center; justify-content: center;
     }
-    .word-letter-btn {
-      width: clamp(38px, 10vw, 52px); height: clamp(48px, 12vw, 64px);
-      background: rgba(212,168,83,0.1); border: 2px solid var(--bronze);
-      border-radius: 8px; color: var(--gold);
-      font-size: clamp(20px, 6vw, 30px); font-weight: bold;
-      cursor: pointer; transition: all 0.15s;
+    .compare-num { font-size: 38px; font-weight: bold; color: var(--gold); line-height: 1; }
+
+    /* ===================== LEVEL 2 - VOWELS ===================== */
+    .vowel-ref-row {
+      display: flex; gap: 6px; justify-content: center;
+      margin-bottom: 6px; flex-wrap: wrap;
+    }
+    .vref {
+      width: clamp(34px, 9vw, 42px); height: clamp(34px, 9vw, 42px);
+      border: 2px solid var(--gold); border-radius: 8px;
+      background: rgba(212,168,83,0.25);
+      font-size: clamp(18px, 5vw, 24px); font-weight: bold; color: var(--gold);
       display: flex; align-items: center; justify-content: center;
     }
-    .word-letter-btn.vowel-found {
-      background: rgba(39,174,96,0.3); border-color: #27ae60; color: #7dffaa;
+    .mystery-big {
+      font-size: clamp(62px, 18vw, 84px); font-weight: bold;
+      color: var(--cream); text-align: center; line-height: 1;
     }
-    .word-letter-btn.consonant-found {
-      background: rgba(52,152,219,0.3); border-color: #3498db; color: #88ccff;
+    .answer-btn.icon-btn { font-size: 40px; min-height: 72px; }
+
+    /* ===================== LEVEL 3 - VISUAL ADD ===================== */
+    .add-equation {
+      display: flex; align-items: center; justify-content: center;
+      gap: 8px; flex-wrap: wrap;
     }
-    .word-letter-btn.wrong-pick {
-      background: rgba(231,76,60,0.3); border-color: #e74c3c;
-      animation: shake 0.3s ease;
-    }
+    .add-group { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .add-num { font-size: 22px; font-weight: bold; color: var(--gold); }
+    .add-icons { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; max-width: 80px; font-size: 18px; }
+    .add-op { font-size: 28px; font-weight: bold; color: var(--cream); }
+    .answer-btn.add-ans-btn { flex-direction: column; gap: 4px; min-height: 80px; }
+    .ans-icons { display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; max-width: 75px; font-size: 15px; }
 
     /* ===================== COMPLETE SCREEN ===================== */
     #screen-complete {
@@ -806,16 +812,8 @@ document.getElementById('btn-menu-go').addEventListener('click', () => {
 });
 
 // ============================================================
-//  QUESTION GENERATORS
+//  HELPERS
 // ============================================================
-
-// --- LEVEL 1: NUMBERS ---
-function getRange(qIndex, total) {
-  const pct = qIndex / total;
-  if (pct < 0.3) return [1, 20];
-  if (pct < 0.6) return [1, 50];
-  return [1, 100];
-}
 function randInt(a, b) { return Math.floor(Math.random() * (b - a + 1)) + a; }
 function shuffle(arr) {
   const a = [...arr];
@@ -825,177 +823,90 @@ function shuffle(arr) {
   }
   return a;
 }
-
-function makeL1Question(idx, total) {
-  const [lo, hi] = getRange(idx, total);
-  const type = randInt(0, 4);
-
-  if (type === 0) {
-    // Which is bigger? (2 numbers)
-    let a = randInt(lo, hi), b;
-    do { b = randInt(lo, hi); } while (b === a);
-    const bigger = Math.max(a, b);
-    const opts = shuffle([a, b]);
-    return {
-      type: 'choose',
-      playerPower: a, enemyPower: b,
-      text: `¿Cuál número es <span class="question-highlight">mayor</span>?`,
-      options: opts.map(v => ({ label: String(v), value: v })),
-      correct: bigger,
-      cols: 2,
-    };
-  }
-  if (type === 1) {
-    // Which is smaller? (2 numbers)
-    let a = randInt(lo, hi), b;
-    do { b = randInt(lo, hi); } while (b === a);
-    const smaller = Math.min(a, b);
-    const opts = shuffle([a, b]);
-    return {
-      type: 'choose',
-      playerPower: a, enemyPower: b,
-      text: `¿Cuál número es <span class="question-highlight">menor</span>?`,
-      options: opts.map(v => ({ label: String(v), value: v })),
-      correct: smaller,
-      cols: 2,
-    };
-  }
-  if (type === 2) {
-    // Can you defeat the enemy? (yes/no)
-    let a = randInt(lo, hi), b;
-    do { b = randInt(lo, hi); } while (b === a);
-    const canWin = a > b;
-    return {
-      type: 'choose',
-      playerPower: a, enemyPower: b,
-      text: `Tu poder es <span class="question-highlight">${a}</span>. El rival tiene <span class="question-highlight">${b}</span>. ¿Puedes vencerlo?`,
-      options: [{ label: '⚔ ¡SÍ, ATACA!', value: 'si' }, { label: '🛡 ¡NO, HUYE!', value: 'no' }],
-      correct: canWin ? 'si' : 'no',
-      cols: 2,
-    };
-  }
-  if (type === 3) {
-    // Pick the biggest among 3
-    const nums = [];
-    while (nums.length < 3) {
-      const n = randInt(lo, hi);
-      if (!nums.includes(n)) nums.push(n);
-    }
-    const biggest = Math.max(...nums);
-    const opts = shuffle(nums);
-    return {
-      type: 'choose',
-      playerPower: opts[0], enemyPower: opts[1],
-      text: `¿Cuál es el número <span class="question-highlight">más grande</span>?`,
-      options: opts.map(v => ({ label: String(v), value: v })),
-      correct: biggest,
-      cols: 2,
-    };
-  }
-  // type === 4: order 3 numbers ascending
-  const nums = [];
-  while (nums.length < 3) {
-    const n = randInt(lo, hi);
-    if (!nums.includes(n)) nums.push(n);
-  }
-  const sorted = [...nums].sort((a, b) => a - b);
-  const displayed = shuffle(nums);
-  return {
-    type: 'order',
-    playerPower: nums[0], enemyPower: nums[1],
-    text: `Ordena de <span class="question-highlight">menor a mayor</span>. Toca en orden:`,
-    options: displayed.map(v => ({ label: String(v), value: v })),
-    correct: sorted,
-    cols: 2,
-  };
+// Render N colored dots
+function dotsHTML(n, color = '#D4A853') {
+  let h = '<div class="dots-grid">';
+  for (let i = 0; i < n; i++) h += `<span class="dot" style="background:${color}"></span>`;
+  return h + '</div>';
+}
+// Render N sword icons
+function iconsHTML(n, icon = '⚔️') {
+  let h = '<div class="add-icons">';
+  for (let i = 0; i < n; i++) h += `<span>${icon}</span>`;
+  return h + '</div>';
 }
 
-// --- LEVEL 2: LETTERS ---
+// ============================================================
+//  QUESTION GENERATORS
+// ============================================================
+
+// --- LEVEL 1: NUMBERS (visual, max 20, dots shown) ---
 const VOWELS = ['A','E','I','O','U'];
 const CONSONANTS = ['B','C','D','F','G','H','J','K','L','M','N','Ñ','P','Q','R','S','T','V','W','X','Y','Z'];
-const SPANISH_WORDS = [
-  'ROMA','GATO','LUNA','CASA','PERA','MESA','LIBRO','ARENA','ARMA',
-  'LEON','ROBLE','CIUDAD','CAMPO','FUEGO','AGUA','HIERRO','ORO',
-  'LOBO','NUBE','ISLA','PLUMA','VIENTO','ROCA','TORRE',
-];
 
-function makeL2Question(idx, total) {
-  const pct = idx / total;
-  // First third: classify single letter
-  // Second third: classify single letter (harder: use full alphabet)
-  // Last third: word - tap all vowels
-  if (pct < 0.5) {
-    const all = [...VOWELS, ...CONSONANTS];
-    const letter = all[randInt(0, all.length - 1)];
-    const isVowel = VOWELS.includes(letter);
+function makeL1Question(idx, total) {
+  // Difficulty ramp: 1-10, then 1-15, then 1-20
+  const maxNum = idx < total * 0.33 ? 10 : idx < total * 0.66 ? 15 : 20;
+  const minDiff = maxNum <= 10 ? 2 : 3;
+  const type = Math.random() < 0.6 ? 'compare' : 'can-win';
+
+  let a, b;
+  do {
+    a = randInt(1, maxNum);
+    b = randInt(1, maxNum);
+  } while (Math.abs(a - b) < minDiff);
+
+  if (type === 'compare') {
+    const askBigger = Math.random() < 0.5;
     return {
-      type: 'classify',
-      playerPower: '?', enemyPower: '?',
-      letter,
-      text: `La letra <span class="question-highlight">${letter}</span> es...`,
-      options: [
-        { label: '🔵 VOCAL', value: 'vocal' },
-        { label: '🔴 CONSONANTE', value: 'consonante' },
-      ],
-      correct: isVowel ? 'vocal' : 'consonante',
-      cols: 2,
+      type: 'compare',
+      askBigger,
+      numA: a, numB: b,
+      correct: askBigger ? Math.max(a, b) : Math.min(a, b),
+      playerPower: a, enemyPower: b,
+    };
+  } else {
+    return {
+      type: 'can-win',
+      playerNum: a, enemyNum: b,
+      correct: a > b ? 'attack' : 'flee',
+      playerPower: a, enemyPower: b,
     };
   }
-  // Word - tap all vowels
-  const word = SPANISH_WORDS[randInt(0, SPANISH_WORDS.length - 1)];
-  const vowelPositions = [...word].map((c, i) => VOWELS.includes(c) ? i : -1).filter(i => i >= 0);
+}
+
+// --- LEVEL 2: VOWELS (visual reference, no reading needed) ---
+function makeL2Question(idx, total) {
+  const all = [...VOWELS, ...CONSONANTS];
+  const letter = all[randInt(0, all.length - 1)];
   return {
-    type: 'word-vowels',
+    type: 'vowel-check',
+    letter,
+    correct: VOWELS.includes(letter) ? 'si' : 'no',
     playerPower: '?', enemyPower: '?',
-    word,
-    vowelPositions,
-    text: `Toca todas las <span class="question-highlight">vocales</span> de la palabra:`,
   };
 }
 
-// --- LEVEL 3: MATH ---
-function getMathRange(idx, total) {
-  const pct = idx / total;
-  if (pct < 0.3) return 10;
-  if (pct < 0.65) return 20;
-  return 50;
-}
+// --- LEVEL 3: VISUAL ADDITION (icons to count, max 5+5) ---
 function makeL3Question(idx, total) {
-  const max = getMathRange(idx, total);
-  const type = randInt(0, 1); // 0=sum, 1=sub
-  if (type === 0) {
-    const a = randInt(1, Math.floor(max * 0.7));
-    const b = randInt(1, max - a);
-    const result = a + b;
-    const wrong1 = result + randInt(1, 5);
-    const wrong2 = Math.max(1, result - randInt(1, 5));
-    const wrong3 = result + randInt(6, 12);
-    const opts = shuffle([result, wrong1, wrong2, wrong3].filter((v,i,a) => a.indexOf(v) === i).slice(0,4));
-    while (opts.length < 4) opts.push(result + opts.length * 3);
-    return {
-      type: 'choose',
-      playerPower: a, enemyPower: b,
-      text: `<span class="question-highlight">${a} + ${b}</span> = ?<br><small style="color:#c8a060;font-size:0.75em">¡Suma tus poderes para atacar!</small>`,
-      options: shuffle([result, wrong1, wrong2, wrong3]).map(v => ({ label: String(v), value: v })),
-      correct: result,
-      cols: 4,
-    };
-  } else {
-    const a = randInt(Math.floor(max * 0.3), max);
-    const b = randInt(1, a);
-    const result = a - b;
-    const wrong1 = result + randInt(1, 5);
-    const wrong2 = Math.max(0, result - randInt(1, 5));
-    const wrong3 = result + randInt(6, 11);
-    return {
-      type: 'choose',
-      playerPower: a, enemyPower: b,
-      text: `<span class="question-highlight">${a} − ${b}</span> = ?<br><small style="color:#c8a060;font-size:0.75em">¡Resta para conocer tu fuerza!</small>`,
-      options: shuffle([result, wrong1, wrong2, wrong3]).map(v => ({ label: String(v), value: v })),
-      correct: result,
-      cols: 4,
-    };
+  const maxA = idx < total * 0.4 ? 3 : 5;
+  const maxB = idx < total * 0.4 ? 3 : 5;
+  const a = randInt(1, maxA);
+  const b = randInt(1, maxB);
+  const result = a + b;
+  // Two wrong answers
+  const wrongs = new Set();
+  while (wrongs.size < 2) {
+    const w = randInt(Math.max(1, result - 3), result + 3);
+    if (w !== result) wrongs.add(w);
   }
+  return {
+    type: 'visual-add',
+    a, b, result,
+    options: shuffle([result, ...[...wrongs]]),
+    correct: result,
+    playerPower: a, enemyPower: b,
+  };
 }
 
 // ============================================================
@@ -1030,25 +941,45 @@ function startLevel(lv) {
 function loadQuestion() {
   if (questionIndex >= totalQuestions) { endLevel(); return; }
   awaitingNext = false;
-  orderSelected = [];
   currentQ = questions[questionIndex];
   document.getElementById('q-current').textContent = questionIndex + 1;
   document.getElementById('q-total').textContent = totalQuestions;
-  document.getElementById('question-text').innerHTML = currentQ.text;
 
   // Badges
   document.getElementById('player-badge').textContent = currentQ.playerPower;
   document.getElementById('enemy-badge').textContent = currentQ.enemyPower;
 
-  // Reset anim
-  const pw = document.getElementById('player-wrap');
-  const ew = document.getElementById('enemy-wrap');
-  pw.classList.remove('player-attack','got-hit');
-  ew.classList.remove('enemy-attack','got-hit');
+  // Reset animations
+  document.getElementById('player-wrap').classList.remove('player-attack','got-hit');
+  document.getElementById('enemy-wrap').classList.remove('enemy-attack','got-hit');
+  document.getElementById('feedback-bubble').classList.remove('show','correct-fb','wrong-fb');
 
-  // Hide feedback
-  const fb = document.getElementById('feedback-bubble');
-  fb.classList.remove('show','correct-fb','wrong-fb');
+  // Set question content based on type
+  const qt = document.getElementById('question-text');
+  if (currentQ.type === 'compare') {
+    qt.innerHTML = currentQ.askBigger
+      ? '<span style="font-size:2em">🔺</span>'
+      : '<span style="font-size:2em">🔻</span>';
+  } else if (currentQ.type === 'can-win') {
+    qt.innerHTML =
+      `<div style="display:flex;gap:16px;justify-content:center;align-items:center">
+         <div style="text-align:center">${dotsHTML(currentQ.playerNum,'#D4A853')}<div style="font-size:11px;color:#c8a060;margin-top:2px">TÚ</div></div>
+         <div style="font-size:22px;color:var(--cream)">VS</div>
+         <div style="text-align:center">${dotsHTML(currentQ.enemyNum,'#e74c3c')}<div style="font-size:11px;color:#c8a060;margin-top:2px">RIVAL</div></div>
+       </div>`;
+  } else if (currentQ.type === 'vowel-check') {
+    qt.innerHTML =
+      `<div class="vowel-ref-row">${VOWELS.map(v=>`<div class="vref">${v}</div>`).join('')}</div>
+       <div class="mystery-big">${currentQ.letter}</div>`;
+  } else if (currentQ.type === 'visual-add') {
+    qt.innerHTML =
+      `<div class="add-equation">
+         <div class="add-group"><div class="add-num">${currentQ.a}</div>${iconsHTML(currentQ.a,'⚔️')}</div>
+         <div class="add-op">+</div>
+         <div class="add-group"><div class="add-num">${currentQ.b}</div>${iconsHTML(currentQ.b,'🛡️')}</div>
+         <div class="add-op">= ?</div>
+       </div>`;
+  }
 
   renderAnswers();
 }
@@ -1058,142 +989,56 @@ function renderAnswers() {
   grid.innerHTML = '';
   grid.className = 'answer-grid';
 
-  if (currentQ.type === 'word-vowels') {
-    renderWordQuestion(grid);
-    return;
-  }
-  if (currentQ.type === 'order') {
-    renderOrderQuestion(grid);
-    return;
-  }
-  // Standard choose
-  const cols = currentQ.cols || 2;
-  grid.classList.add(cols === 4 ? 'cols-4' : 'cols-2');
-  currentQ.options.forEach(opt => {
+  if (currentQ.type === 'compare')    { renderCompare(grid); return; }
+  if (currentQ.type === 'can-win')    { renderCanWin(grid);  return; }
+  if (currentQ.type === 'vowel-check'){ renderVowelCheck(grid); return; }
+  if (currentQ.type === 'visual-add') { renderVisualAdd(grid); return; }
+}
+
+// Level 1 – tap the bigger/smaller number (shows number + dots)
+function renderCompare(grid) {
+  grid.classList.add('cols-2');
+  [currentQ.numA, currentQ.numB].forEach(num => {
     const btn = document.createElement('button');
-    btn.className = 'answer-btn';
-    if (opt.value === 'si') btn.classList.add('yes-btn');
-    if (opt.value === 'no') btn.classList.add('no-btn');
-    // Long text gets smaller font
-    if (String(opt.label).length > 4) btn.classList.add('small-text');
-    btn.innerHTML = opt.label;
-    btn.addEventListener('click', () => handleAnswer(opt.value, btn));
+    btn.className = 'answer-btn compare-btn';
+    btn.innerHTML = `<div class="compare-num">${num}</div>${dotsHTML(num)}`;
+    btn.addEventListener('click', () => handleAnswer(num, btn));
     grid.appendChild(btn);
   });
 }
 
-function renderWordQuestion(grid) {
-  grid.classList.add('cols-1');
-  // Word letter buttons
-  const wordRow = document.createElement('div');
-  wordRow.className = 'word-display';
-  const word = currentQ.word;
-  const vowelPositions = currentQ.vowelPositions;
-  let foundVowels = new Set();
-
-  [...word].forEach((ch, i) => {
+// Level 1 – can you win? tap ⚔️ or 🛡️
+function renderCanWin(grid) {
+  grid.classList.add('cols-2');
+  [['attack','⚔️','yes-btn'],['flee','🛡️','no-btn']].forEach(([val, icon, cls]) => {
     const btn = document.createElement('button');
-    btn.className = 'word-letter-btn';
-    btn.textContent = ch;
-    btn.dataset.index = i;
-    btn.addEventListener('click', () => {
-      if (awaitingNext) return;
-      if (VOWELS.includes(ch)) {
-        if (!foundVowels.has(i)) {
-          foundVowels.add(i);
-          btn.classList.add('vowel-found');
-          SFX.correct();
-          // Check if all vowels found
-          if (foundVowels.size === vowelPositions.length) {
-            updateScore(score + 10);
-            animateFighters(true);
-            setTimeout(() => {
-              questionIndex++;
-              loadQuestion();
-            }, 900);
-          }
-        }
-      } else {
-        btn.classList.add('wrong-pick');
-        SFX.wrong();
-        loseHP();
-        setTimeout(() => btn.classList.remove('wrong-pick'), 500);
-      }
-    });
-    wordRow.appendChild(btn);
+    btn.className = `answer-btn icon-btn ${cls}`;
+    btn.innerHTML = icon;
+    btn.addEventListener('click', () => handleAnswer(val, btn));
+    grid.appendChild(btn);
   });
-  grid.appendChild(wordRow);
-
-  // Hint
-  const hint = document.createElement('div');
-  hint.className = 'order-instructions';
-  hint.textContent = `Hay ${vowelPositions.length} vocal${vowelPositions.length !== 1 ? 'es' : ''} en esta palabra`;
-  grid.appendChild(hint);
 }
 
-function renderOrderQuestion(grid) {
+// Level 2 – is it a vowel? tap ✅ or ❌
+function renderVowelCheck(grid) {
   grid.classList.add('cols-2');
-  // Buttons to tap
-  const nums = currentQ.options;
-  const correct = currentQ.correct; // sorted array
-  let tapped = [];
-  const resultSlots = [];
-
-  // Result display
-  const resultRow = document.createElement('div');
-  resultRow.className = 'order-result';
-  correct.forEach(() => {
-    const slot = document.createElement('div');
-    slot.className = 'order-slot';
-    slot.textContent = '?';
-    resultRow.appendChild(slot);
-    resultSlots.push(slot);
-  });
-  grid.appendChild(resultRow);
-
-  const hint = document.createElement('div');
-  hint.className = 'order-instructions';
-  hint.textContent = 'Toca los números en orden: menor → mayor';
-  grid.appendChild(hint);
-
-  nums.forEach(opt => {
+  [['si','✅','yes-btn'],['no','❌','no-btn']].forEach(([val, icon, cls]) => {
     const btn = document.createElement('button');
-    btn.className = 'answer-btn';
-    btn.textContent = opt.label;
-    btn.dataset.val = opt.value;
-    btn.addEventListener('click', () => {
-      if (awaitingNext) return;
-      if (btn.classList.contains('order-selected') || btn.classList.contains('order-correct')) return;
-      const expected = correct[tapped.length];
-      if (opt.value === expected) {
-        tapped.push(opt.value);
-        btn.classList.add('order-selected');
-        SFX.correct();
-        const slot = resultSlots[tapped.length - 1];
-        slot.textContent = opt.value;
-        slot.classList.add('filled');
-        if (tapped.length === correct.length) {
-          // All correct
-          btn.classList.remove('order-selected');
-          btn.classList.add('order-correct');
-          grid.querySelectorAll('.answer-btn.order-selected').forEach(b => b.classList.add('order-correct'));
-          updateScore(score + 10);
-          animateFighters(true);
-          showFeedback(true, '¡Orden correcto!');
-          awaitingNext = true;
-          setTimeout(() => { questionIndex++; loadQuestion(); }, 1100);
-        }
-      } else {
-        btn.classList.add('wrong');
-        SFX.wrong();
-        loseHP();
-        setTimeout(() => btn.classList.remove('wrong'), 500);
-        // Reset
-        tapped = [];
-        resultSlots.forEach(s => { s.textContent = '?'; s.classList.remove('filled'); });
-        grid.querySelectorAll('.answer-btn.order-selected').forEach(b => b.classList.remove('order-selected'));
-      }
-    });
+    btn.className = `answer-btn icon-btn ${cls}`;
+    btn.innerHTML = icon;
+    btn.addEventListener('click', () => handleAnswer(val, btn));
+    grid.appendChild(btn);
+  });
+}
+
+// Level 3 – choose the total by counting icons in each option
+function renderVisualAdd(grid) {
+  grid.classList.add('cols-2');
+  currentQ.options.forEach(val => {
+    const btn = document.createElement('button');
+    btn.className = 'answer-btn add-ans-btn';
+    btn.innerHTML = `<div class="add-num">${val}</div><div class="ans-icons">${iconsHTML(val,'⚔️')}</div>`;
+    btn.addEventListener('click', () => handleAnswer(val, btn));
     grid.appendChild(btn);
   });
 }
