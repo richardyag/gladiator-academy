@@ -290,6 +290,21 @@
     .feedback-bubble.correct-fb .feedback-text { color: #7dffaa; }
     .feedback-bubble.wrong-fb .feedback-text { color: #ff8888; }
 
+    /* ===================== TIMER ===================== */
+    .timer-wrap {
+      width: 100%; height: 8px; flex-shrink: 0;
+      background: rgba(255,255,255,0.08);
+    }
+    .timer-bar {
+      height: 100%; width: 100%;
+      background: linear-gradient(90deg, #27ae60 0%, #f39c12 55%, #e74c3c 100%);
+      transform-origin: left;
+    }
+    .timer-bar.urgent { animation: timerUrgent 0.3s ease-in-out infinite alternate; }
+    @keyframes timerUrgent {
+      from { opacity: 1; } to { opacity: 0.4; }
+    }
+
     /* ===================== DOTS (visual numbers) ===================== */
     .dots-grid {
       display: flex; flex-wrap: wrap; gap: 4px;
@@ -464,6 +479,42 @@
     }
     .battle-btn-label { font-size: 11px; color: rgba(255,255,255,0.7); letter-spacing: 1px; }
 
+    /* Word letter tiles (Level 2 word mode) */
+    .word-tiles { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; padding: 4px; }
+    .word-tile {
+      width: clamp(44px,11vw,58px); height: clamp(54px,13vw,68px);
+      background: rgba(212,168,83,0.12); border: 2px solid var(--bronze);
+      border-radius: 10px; color: var(--gold);
+      font-size: clamp(24px,7vw,34px); font-weight: bold;
+      cursor: pointer; transition: all 0.15s;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Georgia', serif;
+    }
+    .word-tile.found  { background: rgba(39,174,96,0.35); border-color:#27ae60; color:#7dffaa; }
+    .word-tile.wrong-tap { animation: shake 0.3s ease; background: rgba(231,76,60,0.3); border-color:#e74c3c; }
+    .word-tile.consonant { opacity: 0.45; cursor: default; }
+
+    /* Multi-enemy select (Level 1 hard mode) */
+    .enemies-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .enemy-card {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      background: rgba(74,55,40,0.5); border: 2px solid var(--bronze);
+      border-radius: 10px; padding: 8px 10px; cursor: pointer; transition: all 0.15s;
+      min-width: 64px;
+    }
+    .enemy-card .ec-num { font-size: 26px; font-weight: bold; color: var(--gold); }
+    .enemy-card .ec-dots { }
+    .enemy-card.selected { border-color: #3498db; background: rgba(52,152,219,0.2); }
+    .enemy-card.correct-pick { border-color: #27ae60; background: rgba(39,174,96,0.25); }
+    .enemy-card.wrong-pick  { border-color: #e74c3c; background: rgba(231,76,60,0.25); animation: shake 0.3s; }
+    .confirm-btn {
+      background: linear-gradient(135deg,#8B0000,#5a0000); border: 2px solid #cc4444;
+      border-radius: 10px; color:#fff; font-size:16px; font-weight:bold;
+      padding: 10px 24px; cursor:pointer; letter-spacing:1px; font-family:'Georgia',serif;
+      transition: all 0.15s;
+    }
+    .confirm-btn:active { transform: scale(0.97); }
+
     /* Torch decoration */
     .torch-row {
       display: flex; justify-content: space-between;
@@ -585,6 +636,8 @@
       </div>
       <div class="score-display" id="score-display">0</div>
     </div>
+    <!-- Timer bar -->
+    <div class="timer-wrap"><div class="timer-bar" id="timer-bar"></div></div>
 
     <div class="torch-row">
       <span class="torch">🔥</span>
@@ -831,6 +884,7 @@ document.querySelectorAll('.level-btn').forEach(btn => {
 
 document.getElementById('btn-back').addEventListener('click', () => {
   SFX.click();
+  stopTimer();
   initMenu();
 });
 
@@ -876,75 +930,146 @@ function iconsHTML(n, icon = '⚔️') {
 }
 
 // ============================================================
+//  TIMER SYSTEM
+// ============================================================
+let timerHandle = null;
+let urgentHandle = null;
+
+function startTimer(secs) {
+  stopTimer();
+  if (hp <= 0) return;
+  const bar = document.getElementById('timer-bar');
+  bar.classList.remove('urgent');
+  bar.style.transition = 'none';
+  bar.style.width = '100%';
+  // double rAF ensures the reset is painted before transition starts
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    bar.style.transition = `width ${secs}s linear`;
+    bar.style.width = '0%';
+  }));
+  // flash urgent at 30% time left
+  urgentHandle = setTimeout(() => bar.classList.add('urgent'), secs * 700);
+  timerHandle = setTimeout(timeUp, secs * 1000);
+}
+
+function stopTimer() {
+  clearTimeout(timerHandle);
+  clearTimeout(urgentHandle);
+  timerHandle = null;
+  const bar = document.getElementById('timer-bar');
+  bar.style.transition = 'none';
+  bar.style.width = '100%';
+  bar.classList.remove('urgent');
+}
+
+function timeUp() {
+  if (awaitingNext || hp <= 0) return;
+  awaitingNext = true;
+  SFX.wrong();
+  loseHP();
+  showFeedback(false, '⏰ ¡Tiempo!');
+  setTimeout(() => { questionIndex++; loadQuestion(); }, 1000);
+}
+
+// ============================================================
 //  QUESTION GENERATORS
 // ============================================================
-
-// --- LEVEL 1: NUMBERS (visual, max 20, dots shown) ---
 const VOWELS = ['A','E','I','O','U'];
 const CONSONANTS = ['B','C','D','F','G','H','J','K','L','M','N','Ñ','P','Q','R','S','T','V','W','X','Y','Z'];
+const SHORT_WORDS = ['ROMA','GATO','LUNA','MESA','PERA','ISLA','OCA','UVA','OSO','EJE','ALA','OLA'];
 
+// --- LEVEL 1: numbers with dots early, numbers only later, multi-enemy hard ---
 function makeL1Question(idx, total) {
-  // Difficulty ramp: 1-10, then 1-15, then 1-20
-  const maxNum = idx < total * 0.33 ? 10 : idx < total * 0.66 ? 15 : 20;
+  const pct = idx / total;
+  const maxNum  = pct < 0.33 ? 10 : pct < 0.66 ? 20 : 30;
+  const showDots = pct < 0.5;           // dots only in first half
   const minDiff = maxNum <= 10 ? 2 : 3;
-  const type = Math.random() < 0.6 ? 'compare' : 'can-win';
+
+  // Last third: multi-enemy challenge
+  if (pct >= 0.66 && Math.random() < 0.5) {
+    const playerN = randInt(5, maxNum);
+    const enemies = [];
+    while (enemies.length < 3) {
+      const e = randInt(1, maxNum);
+      if (e !== playerN && !enemies.includes(e)) enemies.push(e);
+    }
+    // at least one beatable enemy
+    if (!enemies.some(e => e < playerN)) enemies[0] = randInt(1, playerN - 1);
+    return {
+      type: 'multi-enemy',
+      playerN, enemies,
+      correct: enemies.filter(e => e < playerN),
+      playerPower: playerN, enemyPower: '?',
+      showDots,
+    };
+  }
 
   let a, b;
-  do {
-    a = randInt(1, maxNum);
-    b = randInt(1, maxNum);
-  } while (Math.abs(a - b) < minDiff);
+  do { a = randInt(1, maxNum); b = randInt(1, maxNum); }
+  while (Math.abs(a - b) < minDiff);
 
-  if (type === 'compare') {
+  if (Math.random() < 0.6) {
     const askBigger = Math.random() < 0.5;
     return {
-      type: 'compare',
-      askBigger,
-      numA: a, numB: b,
-      correct: askBigger ? Math.max(a, b) : Math.min(a, b),
-      playerPower: a, enemyPower: b,
-    };
-  } else {
-    return {
-      type: 'can-win',
-      playerNum: a, enemyNum: b,
-      correct: a > b ? 'attack' : 'flee',
+      type: 'compare', askBigger, numA: a, numB: b, showDots,
+      correct: askBigger ? Math.max(a,b) : Math.min(a,b),
       playerPower: a, enemyPower: b,
     };
   }
+  return {
+    type: 'can-win', playerNum: a, enemyNum: b, showDots,
+    correct: a > b ? 'attack' : 'flee',
+    playerPower: a, enemyPower: b,
+  };
 }
 
-// --- LEVEL 2: VOWELS (enemy runs in carrying a letter) ---
+// --- LEVEL 2: single letter (early) + word-vowels (later) ---
 function makeL2Question(idx, total) {
+  const pct = idx / total;
+  if (pct >= 0.45 && Math.random() < 0.7) {
+    // Word mode: tap all vowels
+    const word = SHORT_WORDS[randInt(0, SHORT_WORDS.length - 1)];
+    const vowelIdxs = [...word].map((c,i) => VOWELS.includes(c) ? i : -1).filter(i => i >= 0);
+    return {
+      type: 'word-vowels', word, vowelIdxs,
+      playerPower: '?', enemyPower: '?',
+    };
+  }
   const all = [...VOWELS, ...CONSONANTS];
   const letter = all[randInt(0, all.length - 1)];
   const isVowel = VOWELS.includes(letter);
   return {
-    type: 'vowel-check',
-    letter,
-    isVowel,
+    type: 'vowel-check', letter, isVowel,
     correct: isVowel ? 'attack' : 'flee',
-    playerPower: '?',
-    enemyPower: letter,   // shown on enemy badge
+    playerPower: '?', enemyPower: letter,
   };
 }
 
-// --- LEVEL 3: VISUAL ADDITION (icons to count, max 5+5) ---
+// --- LEVEL 3: addition AND subtraction, bigger numbers ---
 function makeL3Question(idx, total) {
-  const maxA = idx < total * 0.4 ? 3 : 5;
-  const maxB = idx < total * 0.4 ? 3 : 5;
-  const a = randInt(1, maxA);
-  const b = randInt(1, maxB);
-  const result = a + b;
-  // Two wrong answers
+  const pct = idx / total;
+  const maxVal = pct < 0.33 ? 8 : pct < 0.66 ? 12 : 18;
+  const doSub  = pct >= 0.4 && Math.random() < 0.5;
+
+  let a, b, result, display;
+  if (doSub) {
+    a = randInt(3, maxVal);
+    b = randInt(1, a - 1);
+    result = a - b;
+    display = `${a} − ${b}`;
+  } else {
+    a = randInt(1, Math.floor(maxVal * 0.7));
+    b = randInt(1, maxVal - a);
+    result = a + b;
+    display = `${a} + ${b}`;
+  }
   const wrongs = new Set();
   while (wrongs.size < 2) {
-    const w = randInt(Math.max(1, result - 3), result + 3);
+    const w = Math.max(0, result + (Math.random() < 0.5 ? 1 : -1) * randInt(1, 4));
     if (w !== result) wrongs.add(w);
   }
   return {
-    type: 'visual-add',
-    a, b, result,
+    type: 'visual-math', a, b, result, display, doSub,
     options: shuffle([result, ...[...wrongs]]),
     correct: result,
     playerPower: a, enemyPower: b,
@@ -999,41 +1124,70 @@ function loadQuestion() {
   document.getElementById('enemy-badge').classList.remove('letter-mode');
   document.getElementById('enemy-col').classList.remove('slide-in-enemy');
 
-  // Set question content based on type
+  // Timer seconds per level/question type
+  const timerSecs = currentLevel === 1 ? (currentQ.type === 'multi-enemy' ? 9 : 6)
+                  : currentLevel === 2 ? (currentQ.type === 'word-vowels' ? 12 : 5)
+                  : 8;
+
+  // Set question area content
   const qt = document.getElementById('question-text');
+
   if (currentQ.type === 'compare') {
     qt.innerHTML = currentQ.askBigger
-      ? '<span style="font-size:2em">🔺</span>'
-      : '<span style="font-size:2em">🔻</span>';
+      ? '<span style="font-size:2.2em">🔺</span>'
+      : '<span style="font-size:2.2em">🔻</span>';
+
   } else if (currentQ.type === 'can-win') {
+    const showD = currentQ.showDots;
     qt.innerHTML =
-      `<div style="display:flex;gap:16px;justify-content:center;align-items:center">
-         <div style="text-align:center">${dotsHTML(currentQ.playerNum,'#D4A853')}<div style="font-size:11px;color:#c8a060;margin-top:2px">TÚ</div></div>
-         <div style="font-size:22px;color:var(--cream)">VS</div>
-         <div style="text-align:center">${dotsHTML(currentQ.enemyNum,'#e74c3c')}<div style="font-size:11px;color:#c8a060;margin-top:2px">RIVAL</div></div>
+      `<div style="display:flex;gap:16px;justify-content:center;align-items:center;flex-wrap:wrap">
+         <div style="text-align:center">
+           ${showD ? dotsHTML(currentQ.playerNum,'#D4A853') : `<span style="font-size:32px;font-weight:bold;color:var(--gold)">${currentQ.playerNum}</span>`}
+           <div style="font-size:10px;color:#c8a060;margin-top:2px">TÚ ⚔️</div>
+         </div>
+         <div style="font-size:20px;color:var(--cream)">VS</div>
+         <div style="text-align:center">
+           ${showD ? dotsHTML(currentQ.enemyNum,'#e74c3c') : `<span style="font-size:32px;font-weight:bold;color:#e74c3c">${currentQ.enemyNum}</span>`}
+           <div style="font-size:10px;color:#c8a060;margin-top:2px">RIVAL 🛡️</div>
+         </div>
        </div>`;
+
+  } else if (currentQ.type === 'multi-enemy') {
+    qt.innerHTML = `<span style="font-size:1.5em">⚔️</span> <span style="color:var(--gold);font-weight:bold;font-size:1.1em">${currentQ.playerN}</span>`;
+
   } else if (currentQ.type === 'vowel-check') {
-    // Enemy slides in carrying the mystery letter
     const ec = document.getElementById('enemy-col');
     ec.classList.remove('slide-in-enemy');
-    void ec.offsetWidth; // reflow
+    void ec.offsetWidth;
     ec.classList.add('slide-in-enemy');
-    // Badge shows the letter, big and glowing
     document.getElementById('enemy-badge').classList.add('letter-mode');
     qt.innerHTML =
       `<div class="vowel-ref-row" id="vowel-ref-row">${VOWELS.map(v=>`<div class="vref" data-v="${v}">${v}</div>`).join('')}</div>
        <div class="mystery-big">${currentQ.letter}</div>`;
-  } else if (currentQ.type === 'visual-add') {
+    setTimeout(() => {
+      if (currentQ && currentQ.isVowel) {
+        const tile = document.querySelector(`#vowel-ref-row [data-v="${currentQ.letter}"]`);
+        if (tile) tile.classList.add('pulse');
+      }
+    }, 600);
+
+  } else if (currentQ.type === 'word-vowels') {
+    qt.innerHTML = `<span style="font-size:1.6em">🔵</span>`;
+
+  } else if (currentQ.type === 'visual-math') {
+    const icon = currentQ.doSub ? '💀' : '⚔️';
+    const icon2 = currentQ.doSub ? '➡️🚪' : '🛡️';
     qt.innerHTML =
       `<div class="add-equation">
          <div class="add-group"><div class="add-num">${currentQ.a}</div>${iconsHTML(currentQ.a,'⚔️')}</div>
-         <div class="add-op">+</div>
-         <div class="add-group"><div class="add-num">${currentQ.b}</div>${iconsHTML(currentQ.b,'🛡️')}</div>
+         <div class="add-op">${currentQ.doSub ? '−' : '+'}</div>
+         <div class="add-group"><div class="add-num">${currentQ.b}</div>${iconsHTML(currentQ.b, currentQ.doSub ? '💨' : '🛡️')}</div>
          <div class="add-op">= ?</div>
        </div>`;
   }
 
   renderAnswers();
+  startTimer(timerSecs);
 }
 
 function renderAnswers() {
@@ -1041,66 +1195,155 @@ function renderAnswers() {
   grid.innerHTML = '';
   grid.className = 'answer-grid';
 
-  if (currentQ.type === 'compare')    { renderCompare(grid); return; }
-  if (currentQ.type === 'can-win')    { renderCanWin(grid);  return; }
-  if (currentQ.type === 'vowel-check'){ renderVowelCheck(grid); return; }
-  if (currentQ.type === 'visual-add') { renderVisualAdd(grid); return; }
+  if (currentQ.type === 'compare')     { renderCompare(grid);     return; }
+  if (currentQ.type === 'can-win')     { renderCanWin(grid);      return; }
+  if (currentQ.type === 'multi-enemy') { renderMultiEnemy(grid);  return; }
+  if (currentQ.type === 'vowel-check') { renderVowelCheck(grid);  return; }
+  if (currentQ.type === 'word-vowels') { renderWordVowels(grid);  return; }
+  if (currentQ.type === 'visual-math') { renderVisualMath(grid);  return; }
 }
 
-// Level 1 – tap the bigger/smaller number (shows number + dots)
+// Level 1 – tap bigger/smaller (with or without dots)
 function renderCompare(grid) {
   grid.classList.add('cols-2');
   [currentQ.numA, currentQ.numB].forEach(num => {
     const btn = document.createElement('button');
     btn.className = 'answer-btn compare-btn';
-    btn.innerHTML = `<div class="compare-num">${num}</div>${dotsHTML(num)}`;
-    btn.addEventListener('click', () => handleAnswer(num, btn));
+    btn.innerHTML = `<div class="compare-num">${num}</div>${currentQ.showDots ? dotsHTML(num) : ''}`;
+    btn.addEventListener('click', () => { stopTimer(); handleAnswer(num, btn); });
     grid.appendChild(btn);
   });
 }
 
-// Level 1 – can you win? tap ⚔️ or 🛡️
+// Level 1 – can you beat the enemy?
 function renderCanWin(grid) {
   grid.classList.add('cols-2');
-  [['attack','⚔️','yes-btn'],['flee','🛡️','no-btn']].forEach(([val, icon, cls]) => {
+  [['attack','⚔️','yes-btn'],['flee','🛡️','no-btn']].forEach(([val,icon,cls]) => {
     const btn = document.createElement('button');
     btn.className = `answer-btn icon-btn ${cls}`;
     btn.innerHTML = icon;
-    btn.addEventListener('click', () => handleAnswer(val, btn));
+    btn.addEventListener('click', () => { stopTimer(); handleAnswer(val, btn); });
     grid.appendChild(btn);
   });
 }
 
-// Level 2 – enemy runs in with a letter; ⚔️ = vowel (attack), 🛡️ = consonant (flee)
+// Level 1 hard – tap all enemies you can beat
+function renderMultiEnemy(grid) {
+  grid.classList.add('cols-1');
+  const enemies = currentQ.enemies;
+  const correct = currentQ.correct; // array of beatable values
+  let selected = new Set();
+
+  const row = document.createElement('div');
+  row.className = 'enemies-row';
+
+  const cards = enemies.map(e => {
+    const card = document.createElement('div');
+    card.className = 'enemy-card';
+    card.innerHTML = `<div class="ec-num">${e}</div>${dotsHTML(e,'#cc8888')}`;
+    card.dataset.val = e;
+    card.addEventListener('click', () => {
+      if (awaitingNext) return;
+      if (selected.has(e)) { selected.delete(e); card.classList.remove('selected'); }
+      else { selected.add(e); card.classList.add('selected'); }
+    });
+    row.appendChild(card);
+    return card;
+  });
+  grid.appendChild(row);
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.className = 'confirm-btn';
+  confirmBtn.textContent = '⚔️ ¡ATACAR!';
+  confirmBtn.addEventListener('click', () => {
+    if (awaitingNext) return;
+    stopTimer();
+    const sel = [...selected];
+    const isCorrect = sel.length === correct.length &&
+      sel.every(v => correct.includes(Number(v)));
+
+    cards.forEach(card => {
+      const v = Number(card.dataset.val);
+      if (correct.includes(v)) card.classList.add('correct-pick');
+      else if (selected.has(v)) card.classList.add('wrong-pick');
+    });
+    confirmBtn.disabled = true;
+
+    awaitingNext = true;
+    if (isCorrect) {
+      SFX.correct(); updateScore(score + 15);
+      animateFighters(true); showFeedback(true, randomCorrectMsg());
+    } else {
+      SFX.wrong(); loseHP();
+      animateFighters(false); showFeedback(false, randomWrongMsg());
+    }
+    setTimeout(() => { questionIndex++; loadQuestion(); }, 1200);
+  });
+  grid.appendChild(confirmBtn);
+}
+
+// Level 2 – enemy runs in with letter; ⚔️=vocal, 🛡️=no
 function renderVowelCheck(grid) {
   grid.classList.add('cols-2');
-
-  // Pulse the matching vowel tile after a short delay
-  setTimeout(() => {
-    if (!currentQ) return;
-    if (currentQ.isVowel) {
-      const tile = document.querySelector(`#vowel-ref-row [data-v="${currentQ.letter}"]`);
-      if (tile) tile.classList.add('pulse');
-    }
-  }, 600);
-
-  [['attack','⚔️','Vocal','yes-btn'],['flee','🛡️','No vocal','no-btn']].forEach(([val, icon, label, cls]) => {
+  [['attack','⚔️','yes-btn'],['flee','🛡️','no-btn']].forEach(([val,icon,cls]) => {
     const btn = document.createElement('button');
     btn.className = `answer-btn battle-btn ${cls}`;
-    btn.innerHTML = `${icon}<span class="battle-btn-label">${label}</span>`;
-    btn.addEventListener('click', () => handleAnswer(val, btn));
+    btn.innerHTML = icon;
+    btn.addEventListener('click', () => { stopTimer(); handleAnswer(val, btn); });
     grid.appendChild(btn);
   });
 }
 
-// Level 3 – choose the total by counting icons in each option
-function renderVisualAdd(grid) {
+// Level 2 – word mode: tap all vowels
+function renderWordVowels(grid) {
+  grid.classList.add('cols-1');
+  const word = currentQ.word;
+  const vowelIdxs = currentQ.vowelIdxs;
+  let found = new Set();
+
+  const tilesRow = document.createElement('div');
+  tilesRow.className = 'word-tiles';
+
+  [...word].forEach((ch, i) => {
+    const tile = document.createElement('button');
+    tile.className = 'word-tile';
+    tile.textContent = ch;
+    tile.addEventListener('click', () => {
+      if (awaitingNext) return;
+      if (VOWELS.includes(ch)) {
+        if (found.has(i)) return;
+        found.add(i);
+        tile.classList.add('found');
+        SFX.correct();
+        if (found.size === vowelIdxs.length) {
+          stopTimer();
+          updateScore(score + 15);
+          animateFighters(true);
+          showFeedback(true, '¡Todas las vocales!');
+          awaitingNext = true;
+          // reveal consonants
+          tilesRow.querySelectorAll('.word-tile:not(.found)').forEach(t => t.classList.add('consonant'));
+          setTimeout(() => { questionIndex++; loadQuestion(); }, 1100);
+        }
+      } else {
+        tile.classList.add('wrong-tap');
+        SFX.wrong(); loseHP();
+        setTimeout(() => tile.classList.remove('wrong-tap'), 400);
+      }
+    });
+    tilesRow.appendChild(tile);
+  });
+  grid.appendChild(tilesRow);
+}
+
+// Level 3 – visual math: answer options with icons
+function renderVisualMath(grid) {
   grid.classList.add('cols-2');
   currentQ.options.forEach(val => {
     const btn = document.createElement('button');
     btn.className = 'answer-btn add-ans-btn';
-    btn.innerHTML = `<div class="add-num">${val}</div><div class="ans-icons">${iconsHTML(val,'⚔️')}</div>`;
-    btn.addEventListener('click', () => handleAnswer(val, btn));
+    btn.innerHTML = `<div class="add-num">${val}</div><div class="ans-icons">${iconsHTML(Math.min(val,10),'⚔️')}</div>`;
+    btn.addEventListener('click', () => { stopTimer(); handleAnswer(val, btn); });
     grid.appendChild(btn);
   });
 }
@@ -1194,6 +1437,7 @@ function randomWrongMsg() {
 //  LEVEL END
 // ============================================================
 function endLevel() {
+  stopTimer();
   const stars = hp >= 3 ? 3 : hp >= 2 ? 2 : hp >= 1 ? 1 : 0;
   // Save progress
   if (stars > 0) {
