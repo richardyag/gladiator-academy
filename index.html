@@ -1,0 +1,1339 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1a0800">
+  <title>Gladiator Academy</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    /* ===================== BASE ===================== */
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    :root {
+      --gold: #D4A853;
+      --dark-gold: #B8860B;
+      --bronze: #8B6914;
+      --crimson: #8B0000;
+      --stone-dark: #1a0800;
+      --stone: #2C1810;
+      --stone-light: #4A3728;
+      --cream: #F5DEB3;
+      --correct: #27ae60;
+      --wrong: #e74c3c;
+      --locked: #555;
+    }
+    html, body { height: 100%; overflow: hidden; font-family: 'Georgia', serif; }
+    body { background: var(--stone-dark); color: var(--cream); }
+
+    #app { width: 100%; height: 100%; position: relative; overflow: hidden; }
+
+    /* ===================== SCREENS ===================== */
+    .screen {
+      position: absolute; inset: 0;
+      display: none; flex-direction: column;
+      background: linear-gradient(180deg, #1a0800 0%, #2C1810 50%, #1a0800 100%);
+    }
+    .screen.active { display: flex; }
+
+    /* ===================== MENU SCREEN ===================== */
+    #screen-menu {
+      align-items: center; justify-content: flex-start;
+      padding: 0;
+      background:
+        radial-gradient(ellipse at 50% 0%, #3a1505 0%, transparent 60%),
+        linear-gradient(180deg, #1a0800 0%, #2C1810 60%, #1a0800 100%);
+    }
+
+    .menu-header {
+      width: 100%; text-align: center;
+      padding: 24px 16px 8px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 100%);
+    }
+    .game-title {
+      font-size: clamp(28px, 8vw, 42px);
+      font-weight: bold; letter-spacing: 4px;
+      color: var(--gold);
+      text-shadow: 0 0 20px rgba(212,168,83,0.6), 2px 2px 4px #000;
+      line-height: 1.1;
+    }
+    .game-subtitle {
+      font-size: 13px; color: #c8a060; letter-spacing: 3px;
+      margin-top: 4px; text-transform: uppercase;
+    }
+
+    .menu-gladiator {
+      flex: 0 0 auto;
+      display: flex; justify-content: center; align-items: center;
+      padding: 8px 0 4px;
+    }
+    .menu-gladiator svg { width: 120px; height: 200px; filter: drop-shadow(0 4px 16px rgba(212,168,83,0.4)); }
+
+    .levels-container {
+      width: 100%; padding: 8px 20px 16px;
+      display: flex; flex-direction: column; gap: 10px;
+      flex: 1; justify-content: center;
+    }
+    .level-btn {
+      display: flex; align-items: center;
+      background: linear-gradient(135deg, rgba(212,168,83,0.15) 0%, rgba(139,105,20,0.25) 100%);
+      border: 2px solid var(--bronze);
+      border-radius: 12px; padding: 14px 16px;
+      cursor: pointer; transition: all 0.2s;
+      gap: 14px; text-decoration: none; color: inherit;
+      position: relative; overflow: hidden;
+    }
+    .level-btn::before {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(212,168,83,0.1) 0%, transparent 100%);
+      opacity: 0; transition: opacity 0.2s;
+    }
+    .level-btn:active::before { opacity: 1; }
+    .level-btn.locked { opacity: 0.45; cursor: not-allowed; }
+    .level-btn.locked .level-icon { filter: grayscale(1); }
+
+    .level-icon { font-size: 32px; flex-shrink: 0; }
+    .level-info { flex: 1; }
+    .level-name { font-size: 18px; font-weight: bold; color: var(--gold); letter-spacing: 1px; }
+    .level-subtitle { font-size: 12px; color: #c8a060; margin-top: 2px; }
+    .level-stars { font-size: 18px; flex-shrink: 0; }
+
+    /* ===================== GAME SCREEN ===================== */
+    #screen-game { justify-content: flex-start; }
+
+    .game-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, transparent 100%);
+      flex-shrink: 0;
+    }
+    .btn-back {
+      background: rgba(212,168,83,0.2); border: 2px solid var(--bronze);
+      color: var(--gold); font-size: 18px; width: 40px; height: 40px;
+      border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .hp-display { display: flex; gap: 4px; }
+    .hp-heart { font-size: 22px; transition: all 0.3s; }
+    .hp-heart.lost { filter: grayscale(1) brightness(0.4); }
+    .score-display {
+      background: rgba(212,168,83,0.15); border: 1px solid var(--bronze);
+      border-radius: 8px; padding: 4px 12px;
+      font-size: 16px; color: var(--gold); font-weight: bold;
+      min-width: 60px; text-align: center;
+    }
+
+    .level-label {
+      text-align: center; font-size: 11px; color: #c8a060;
+      letter-spacing: 2px; text-transform: uppercase;
+      padding: 2px 0; flex-shrink: 0;
+    }
+
+    /* ===================== BATTLE ARENA ===================== */
+    .battle-arena {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 16px;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .battle-arena::before {
+      content: ''; position: absolute; bottom: 0; left: 10%; right: 10%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--bronze), transparent);
+    }
+
+    .fighter-col {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 6px; flex: 0 0 auto;
+    }
+    .fighter-svg-wrap { position: relative; }
+    .fighter-svg-wrap svg { width: 90px; height: 150px; display: block; }
+    .fighter-svg-wrap.enemy svg { transform: scaleX(-1); }
+
+    .power-badge {
+      background: linear-gradient(135deg, var(--dark-gold), var(--bronze));
+      border: 2px solid var(--gold);
+      border-radius: 50%; width: 44px; height: 44px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; font-weight: bold; color: #fff;
+      text-shadow: 1px 1px 2px #000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      flex-shrink: 0;
+    }
+    .power-badge.enemy-badge {
+      background: linear-gradient(135deg, #5a1a1a, #8B0000);
+      border-color: #cc4444;
+    }
+
+    .fighter-name {
+      font-size: 10px; color: #c8a060;
+      letter-spacing: 1px; text-transform: uppercase;
+    }
+
+    .arena-center {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 6px; flex-shrink: 0; padding: 0 4px;
+    }
+    .vs-text {
+      font-size: 20px; font-weight: bold; color: var(--gold);
+      text-shadow: 0 0 10px rgba(212,168,83,0.5);
+      letter-spacing: 2px;
+    }
+    .progress-pill {
+      background: rgba(212,168,83,0.15); border: 1px solid var(--bronze);
+      border-radius: 20px; padding: 3px 10px;
+      font-size: 12px; color: #c8a060;
+    }
+
+    /* ===================== QUESTION AREA ===================== */
+    .question-area {
+      flex: 1; display: flex; flex-direction: column;
+      padding: 10px 16px 16px; gap: 12px;
+      justify-content: flex-start;
+    }
+
+    .question-box {
+      background: rgba(212,168,83,0.08);
+      border: 1px solid rgba(212,168,83,0.3);
+      border-radius: 12px; padding: 14px 16px;
+      text-align: center;
+    }
+    .question-text {
+      font-size: clamp(15px, 4.5vw, 19px);
+      color: var(--cream); line-height: 1.4;
+    }
+    .question-highlight {
+      color: var(--gold); font-weight: bold; font-size: 1.2em;
+    }
+
+    .answer-grid {
+      display: grid; gap: 10px;
+      flex: 1;
+    }
+    .answer-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+    .answer-grid.cols-1 { grid-template-columns: 1fr; }
+    .answer-grid.cols-4 { grid-template-columns: 1fr 1fr; }
+
+    .answer-btn {
+      background: linear-gradient(135deg, rgba(212,168,83,0.15) 0%, rgba(139,105,20,0.2) 100%);
+      border: 2px solid var(--bronze);
+      border-radius: 12px; padding: 12px 8px;
+      color: var(--cream); font-size: clamp(18px, 5vw, 26px); font-weight: bold;
+      cursor: pointer; transition: all 0.15s;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Georgia', serif;
+      min-height: 58px;
+    }
+    .answer-btn:active { transform: scale(0.97); }
+    .answer-btn.correct {
+      background: linear-gradient(135deg, rgba(39,174,96,0.4), rgba(39,174,96,0.2));
+      border-color: #27ae60; color: #7dffaa;
+      animation: pulseCorrect 0.4s ease;
+    }
+    .answer-btn.wrong {
+      background: linear-gradient(135deg, rgba(231,76,60,0.4), rgba(231,76,60,0.2));
+      border-color: #e74c3c; color: #ff8888;
+      animation: shake 0.4s ease;
+    }
+    .answer-btn.order-selected {
+      background: linear-gradient(135deg, rgba(52,152,219,0.4), rgba(52,152,219,0.2));
+      border-color: #3498db; color: #7dc5ff;
+    }
+    .answer-btn.order-correct {
+      background: linear-gradient(135deg, rgba(39,174,96,0.4), rgba(39,174,96,0.2));
+      border-color: #27ae60; color: #7dffaa;
+    }
+    .answer-btn.small-text { font-size: clamp(13px, 3.5vw, 17px); }
+    .answer-btn.yes-btn {
+      background: linear-gradient(135deg, rgba(39,174,96,0.25), rgba(39,174,96,0.1));
+      border-color: #27ae60;
+    }
+    .answer-btn.no-btn {
+      background: linear-gradient(135deg, rgba(231,76,60,0.25), rgba(231,76,60,0.1));
+      border-color: #e74c3c;
+    }
+
+    /* ORDER QUESTION */
+    .order-instructions {
+      font-size: 12px; color: #c8a060; text-align: center;
+    }
+    .order-result {
+      display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+    }
+    .order-slot {
+      width: 50px; height: 50px;
+      border: 2px dashed var(--bronze);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; color: var(--gold); font-weight: bold;
+    }
+    .order-slot.filled { border-style: solid; border-color: var(--gold); }
+
+    /* ===================== FEEDBACK OVERLAY ===================== */
+    #feedback-overlay {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none; z-index: 10;
+    }
+    .feedback-bubble {
+      background: rgba(0,0,0,0.85); border-radius: 20px;
+      padding: 20px 32px; text-align: center;
+      transform: scale(0); transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1);
+      border: 2px solid;
+    }
+    .feedback-bubble.show { transform: scale(1); }
+    .feedback-bubble.correct-fb { border-color: #27ae60; }
+    .feedback-bubble.wrong-fb { border-color: #e74c3c; }
+    .feedback-icon { font-size: 48px; display: block; }
+    .feedback-text { font-size: 20px; font-weight: bold; margin-top: 6px; }
+    .feedback-bubble.correct-fb .feedback-text { color: #7dffaa; }
+    .feedback-bubble.wrong-fb .feedback-text { color: #ff8888; }
+
+    /* ===================== LEVEL 2 SPECIAL ===================== */
+    .letter-display {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 8px; padding: 8px;
+    }
+    .big-letter {
+      font-size: clamp(60px, 18vw, 90px); font-weight: bold;
+      color: var(--gold); line-height: 1;
+      text-shadow: 0 0 30px rgba(212,168,83,0.4), 2px 2px 0 #000;
+      background: rgba(212,168,83,0.08);
+      border: 2px solid rgba(212,168,83,0.3);
+      border-radius: 16px; padding: 10px 24px;
+    }
+    .letter-shield-label { font-size: 12px; color: #c8a060; letter-spacing: 2px; }
+
+    .word-display {
+      display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;
+      padding: 8px;
+    }
+    .word-letter-btn {
+      width: clamp(38px, 10vw, 52px); height: clamp(48px, 12vw, 64px);
+      background: rgba(212,168,83,0.1); border: 2px solid var(--bronze);
+      border-radius: 8px; color: var(--gold);
+      font-size: clamp(20px, 6vw, 30px); font-weight: bold;
+      cursor: pointer; transition: all 0.15s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .word-letter-btn.vowel-found {
+      background: rgba(39,174,96,0.3); border-color: #27ae60; color: #7dffaa;
+    }
+    .word-letter-btn.consonant-found {
+      background: rgba(52,152,219,0.3); border-color: #3498db; color: #88ccff;
+    }
+    .word-letter-btn.wrong-pick {
+      background: rgba(231,76,60,0.3); border-color: #e74c3c;
+      animation: shake 0.3s ease;
+    }
+
+    /* ===================== COMPLETE SCREEN ===================== */
+    #screen-complete {
+      align-items: center; justify-content: center;
+      background: radial-gradient(ellipse at 50% 30%, #3a1505 0%, #1a0800 70%);
+    }
+    .complete-card {
+      background: linear-gradient(180deg, rgba(212,168,83,0.1) 0%, rgba(139,105,20,0.05) 100%);
+      border: 2px solid var(--bronze);
+      border-radius: 20px; padding: 30px 24px;
+      text-align: center; width: 90%; max-width: 380px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(212,168,83,0.2);
+    }
+    .complete-icon { font-size: 60px; margin-bottom: 8px; animation: bounceIn 0.5s ease; }
+    .complete-title { font-size: 28px; font-weight: bold; color: var(--gold); margin-bottom: 12px; }
+    .stars-row { font-size: 36px; margin-bottom: 12px; }
+    .star-anim { display: inline-block; animation: starPop 0.4s ease both; }
+    .star-anim:nth-child(2) { animation-delay: 0.15s; }
+    .star-anim:nth-child(3) { animation-delay: 0.3s; }
+    .complete-score { font-size: 16px; color: #c8a060; margin-bottom: 20px; }
+    .complete-msg { font-size: 14px; color: var(--cream); margin-bottom: 24px; line-height: 1.5; }
+
+    .btns-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--dark-gold), var(--bronze));
+      border: 2px solid var(--gold); border-radius: 12px;
+      color: #fff; font-size: 15px; font-weight: bold;
+      padding: 12px 20px; cursor: pointer; letter-spacing: 1px;
+      transition: all 0.2s; font-family: 'Georgia', serif;
+    }
+    .btn-primary:active { transform: scale(0.97); }
+    .btn-secondary {
+      background: transparent;
+      border: 2px solid var(--bronze); border-radius: 12px;
+      color: var(--gold); font-size: 15px; font-weight: bold;
+      padding: 12px 20px; cursor: pointer; letter-spacing: 1px;
+      transition: all 0.2s; font-family: 'Georgia', serif;
+    }
+    .btn-secondary:active { transform: scale(0.97); }
+
+    /* ===================== GAME OVER ===================== */
+    #screen-gameover {
+      align-items: center; justify-content: center;
+      background: radial-gradient(ellipse at 50% 50%, #3a0505 0%, #1a0000 70%);
+    }
+
+    /* ===================== ANIMATIONS ===================== */
+    @keyframes pulseCorrect {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); box-shadow: 0 0 20px #27ae60; }
+      100% { transform: scale(1); }
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-6px); }
+      40% { transform: translateX(6px); }
+      60% { transform: translateX(-4px); }
+      80% { transform: translateX(4px); }
+    }
+    @keyframes bounceIn {
+      0% { transform: scale(0.5); opacity: 0; }
+      70% { transform: scale(1.1); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes starPop {
+      0% { transform: scale(0) rotate(-30deg); opacity: 0; }
+      70% { transform: scale(1.3) rotate(5deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0); opacity: 1; }
+    }
+    @keyframes attackRight {
+      0% { transform: translateX(0); }
+      40% { transform: translateX(22px); }
+      100% { transform: translateX(0); }
+    }
+    @keyframes attackLeft {
+      0% { transform: translateX(0); }
+      40% { transform: translateX(-22px); }
+      100% { transform: translateX(0); }
+    }
+    @keyframes hitShake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-8px); }
+      75% { transform: translateX(8px); }
+    }
+    @keyframes torchFlicker {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.85; }
+    }
+    .player-attack { animation: attackRight 0.4s ease; }
+    .enemy-attack  { animation: attackLeft  0.4s ease; }
+    .got-hit       { animation: hitShake    0.4s ease; }
+
+    /* Torch decoration */
+    .torch-row {
+      display: flex; justify-content: space-between;
+      padding: 0 10px; flex-shrink: 0;
+    }
+    .torch { font-size: 22px; animation: torchFlicker 1.5s ease-in-out infinite; }
+    .torch:nth-child(2) { animation-delay: 0.7s; }
+
+    /* Responsive adjustments for small screens */
+    @media (max-height: 640px) {
+      .menu-gladiator svg { width: 80px; height: 130px; }
+      .level-btn { padding: 10px 12px; }
+      .level-name { font-size: 15px; }
+      .fighter-svg-wrap svg { width: 70px; height: 115px; }
+      .battle-arena { padding: 4px 12px; }
+    }
+    @media (max-height: 580px) {
+      .fighter-svg-wrap svg { width: 56px; height: 93px; }
+      .big-letter { font-size: 48px; padding: 6px 18px; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ==================== MENU ==================== -->
+  <div id="screen-menu" class="screen active">
+    <div class="menu-header">
+      <div class="game-title">GLADIATOR<br>ACADEMY</div>
+      <div class="game-subtitle">⚔ Academia del Imperio ⚔</div>
+    </div>
+    <div class="menu-gladiator">
+      <!-- Hero Gladiator SVG -->
+      <svg viewBox="0 0 100 180" xmlns="http://www.w3.org/2000/svg">
+        <!-- Plume -->
+        <path d="M 40,26 C 35,4 50,0 50,0 C 50,0 65,4 60,26" fill="#CC0000"/>
+        <path d="M 43,25 C 40,8 50,3 50,3 C 50,3 60,8 57,25" fill="#FF2020" opacity="0.7"/>
+        <!-- Helmet -->
+        <ellipse cx="50" cy="40" rx="21" ry="15" fill="#B8860B"/>
+        <path d="M 29,42 Q 50,28 71,42" fill="#A07820"/>
+        <!-- Visor -->
+        <rect x="34" y="38" width="32" height="8" fill="#111" rx="3"/>
+        <!-- Cheekpieces -->
+        <ellipse cx="31" cy="50" rx="7" ry="9" fill="#A07820"/>
+        <ellipse cx="69" cy="50" rx="7" ry="9" fill="#A07820"/>
+        <!-- Neck -->
+        <rect x="43" y="53" width="14" height="10" fill="#D4A574"/>
+        <!-- Torso armor -->
+        <rect x="27" y="63" width="46" height="52" fill="#B8860B" rx="7"/>
+        <rect x="27" y="75" width="46" height="5" fill="#A07820" opacity="0.6"/>
+        <rect x="27" y="86" width="46" height="5" fill="#A07820" opacity="0.6"/>
+        <rect x="27" y="97" width="46" height="5" fill="#A07820" opacity="0.6"/>
+        <!-- Chest emblem -->
+        <circle cx="50" cy="79" r="6" fill="#D4A853" opacity="0.4"/>
+        <!-- Shield (left) -->
+        <ellipse cx="14" cy="83" rx="13" ry="21" fill="#8B0000"/>
+        <ellipse cx="14" cy="83" rx="9" ry="17" fill="#A00000"/>
+        <line x1="14" y1="62" x2="14" y2="104" stroke="#FFD700" stroke-width="2"/>
+        <line x1="1"  y1="83" x2="27"  y2="83" stroke="#FFD700" stroke-width="2"/>
+        <!-- Sword (right, raised) -->
+        <line x1="73" y1="70" x2="94" y2="50" stroke="#B0B0B0" stroke-width="5" stroke-linecap="round"/>
+        <line x1="84" y1="58" x2="93" y2="49" stroke="#8B6914" stroke-width="5" stroke-linecap="round"/>
+        <polygon points="94,50 100,42 103,55 97,60" fill="#DDD"/>
+        <!-- Pteruges (skirt flaps) -->
+        <g fill="#A07820">
+          <rect x="29" y="113" width="9" height="15" rx="2" transform="rotate(-4,29,113)"/>
+          <rect x="40" y="113" width="9" height="15" rx="2"/>
+          <rect x="51" y="113" width="9" height="15" rx="2"/>
+          <rect x="62" y="113" width="9" height="15" rx="2" transform="rotate(4,62,113)"/>
+        </g>
+        <!-- Legs -->
+        <rect x="33" y="125" width="13" height="36" fill="#C8A040" rx="4"/>
+        <rect x="54" y="125" width="13" height="36" fill="#C8A040" rx="4"/>
+        <!-- Sandal straps -->
+        <rect x="28" y="155" width="21" height="4" fill="#6B3A10"/>
+        <rect x="51" y="155" width="21" height="4" fill="#6B3A10"/>
+        <!-- Feet -->
+        <ellipse cx="39" cy="162" rx="14" ry="5" fill="#6B3A10"/>
+        <ellipse cx="61" cy="162" rx="14" ry="5" fill="#6B3A10"/>
+      </svg>
+    </div>
+
+    <div class="levels-container">
+      <div class="level-btn" data-level="1" id="btn-level-1">
+        <div class="level-icon">⚔️</div>
+        <div class="level-info">
+          <div class="level-name">Nivel I</div>
+          <div class="level-subtitle">La Arena de los Números</div>
+        </div>
+        <div class="level-stars" id="stars-1">☆☆☆</div>
+      </div>
+      <div class="level-btn locked" data-level="2" id="btn-level-2">
+        <div class="level-icon">📜</div>
+        <div class="level-info">
+          <div class="level-name">Nivel II</div>
+          <div class="level-subtitle">El Coliseo de las Letras</div>
+        </div>
+        <div class="level-stars" id="stars-2">🔒</div>
+      </div>
+      <div class="level-btn locked" data-level="3" id="btn-level-3">
+        <div class="level-icon">🔢</div>
+        <div class="level-info">
+          <div class="level-name">Nivel III</div>
+          <div class="level-subtitle">El Imperio Matemático</div>
+        </div>
+        <div class="level-stars" id="stars-3">🔒</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== GAME ==================== -->
+  <div id="screen-game" class="screen">
+    <div class="game-header">
+      <button class="btn-back" id="btn-back">←</button>
+      <div class="hp-display">
+        <span class="hp-heart" id="hp1">❤️</span>
+        <span class="hp-heart" id="hp2">❤️</span>
+        <span class="hp-heart" id="hp3">❤️</span>
+      </div>
+      <div class="score-display" id="score-display">0</div>
+    </div>
+
+    <div class="torch-row">
+      <span class="torch">🔥</span>
+      <div class="level-label" id="level-label">Nivel I · La Arena de los Números</div>
+      <span class="torch">🔥</span>
+    </div>
+
+    <div class="battle-arena">
+      <!-- Player -->
+      <div class="fighter-col">
+        <div class="fighter-svg-wrap player" id="player-wrap">
+          <svg viewBox="0 0 100 180" xmlns="http://www.w3.org/2000/svg" id="player-svg">
+            <path d="M 40,26 C 35,4 50,0 50,0 C 50,0 65,4 60,26" fill="#CC0000"/>
+            <path d="M 43,25 C 40,8 50,3 50,3 C 50,3 60,8 57,25" fill="#FF2020" opacity="0.7"/>
+            <ellipse cx="50" cy="40" rx="21" ry="15" fill="#B8860B"/>
+            <path d="M 29,42 Q 50,28 71,42" fill="#A07820"/>
+            <rect x="34" y="38" width="32" height="8" fill="#111" rx="3"/>
+            <ellipse cx="31" cy="50" rx="7" ry="9" fill="#A07820"/>
+            <ellipse cx="69" cy="50" rx="7" ry="9" fill="#A07820"/>
+            <rect x="43" y="53" width="14" height="10" fill="#D4A574"/>
+            <rect x="27" y="63" width="46" height="52" fill="#B8860B" rx="7"/>
+            <rect x="27" y="75" width="46" height="5" fill="#A07820" opacity="0.6"/>
+            <rect x="27" y="86" width="46" height="5" fill="#A07820" opacity="0.6"/>
+            <rect x="27" y="97" width="46" height="5" fill="#A07820" opacity="0.6"/>
+            <ellipse cx="14" cy="83" rx="13" ry="21" fill="#8B0000"/>
+            <ellipse cx="14" cy="83" rx="9" ry="17" fill="#A00000"/>
+            <line x1="14" y1="62" x2="14" y2="104" stroke="#FFD700" stroke-width="2"/>
+            <line x1="1"  y1="83" x2="27"  y2="83" stroke="#FFD700" stroke-width="2"/>
+            <line x1="73" y1="70" x2="94" y2="50" stroke="#B0B0B0" stroke-width="5" stroke-linecap="round"/>
+            <line x1="84" y1="58" x2="93" y2="49" stroke="#8B6914" stroke-width="5" stroke-linecap="round"/>
+            <polygon points="94,50 100,42 103,55 97,60" fill="#DDD"/>
+            <g fill="#A07820">
+              <rect x="29" y="113" width="9" height="15" rx="2" transform="rotate(-4,29,113)"/>
+              <rect x="40" y="113" width="9" height="15" rx="2"/>
+              <rect x="51" y="113" width="9" height="15" rx="2"/>
+              <rect x="62" y="113" width="9" height="15" rx="2" transform="rotate(4,62,113)"/>
+            </g>
+            <rect x="33" y="125" width="13" height="36" fill="#C8A040" rx="4"/>
+            <rect x="54" y="125" width="13" height="36" fill="#C8A040" rx="4"/>
+            <rect x="28" y="155" width="21" height="4" fill="#6B3A10"/>
+            <rect x="51" y="155" width="21" height="4" fill="#6B3A10"/>
+            <ellipse cx="39" cy="162" rx="14" ry="5" fill="#6B3A10"/>
+            <ellipse cx="61" cy="162" rx="14" ry="5" fill="#6B3A10"/>
+          </svg>
+        </div>
+        <div class="power-badge" id="player-badge">?</div>
+        <div class="fighter-name">TÚ</div>
+      </div>
+
+      <div class="arena-center">
+        <div class="vs-text">⚔</div>
+        <div class="progress-pill"><span id="q-current">1</span>/<span id="q-total">10</span></div>
+      </div>
+
+      <!-- Enemy -->
+      <div class="fighter-col">
+        <div class="fighter-svg-wrap enemy" id="enemy-wrap">
+          <svg viewBox="0 0 100 180" xmlns="http://www.w3.org/2000/svg" id="enemy-svg">
+            <!-- Enemy: dark armor, orange plume -->
+            <path d="M 40,26 C 35,4 50,0 50,0 C 50,0 65,4 60,26" fill="#FF8C00"/>
+            <path d="M 43,25 C 40,8 50,3 50,3 C 50,3 60,8 57,25" fill="#FFA500" opacity="0.7"/>
+            <ellipse cx="50" cy="40" rx="21" ry="15" fill="#4a4a6a"/>
+            <path d="M 29,42 Q 50,28 71,42" fill="#3a3a5a"/>
+            <rect x="34" y="38" width="32" height="8" fill="#200" rx="3"/>
+            <ellipse cx="31" cy="50" rx="7" ry="9" fill="#3a3a5a"/>
+            <ellipse cx="69" cy="50" rx="7" ry="9" fill="#3a3a5a"/>
+            <rect x="43" y="53" width="14" height="10" fill="#C4855A"/>
+            <rect x="27" y="63" width="46" height="52" fill="#4a4a6a" rx="7"/>
+            <rect x="27" y="75" width="46" height="5" fill="#3a3a5a" opacity="0.8"/>
+            <rect x="27" y="86" width="46" height="5" fill="#3a3a5a" opacity="0.8"/>
+            <rect x="27" y="97" width="46" height="5" fill="#3a3a5a" opacity="0.8"/>
+            <ellipse cx="14" cy="83" rx="13" ry="21" fill="#2a2a4a"/>
+            <ellipse cx="14" cy="83" rx="9" ry="17" fill="#3a3a5a"/>
+            <line x1="14" y1="62" x2="14" y2="104" stroke="#8888cc" stroke-width="2"/>
+            <line x1="1"  y1="83" x2="27"  y2="83" stroke="#8888cc" stroke-width="2"/>
+            <line x1="73" y1="70" x2="94" y2="50" stroke="#A0A0A0" stroke-width="5" stroke-linecap="round"/>
+            <line x1="84" y1="58" x2="93" y2="49" stroke="#5a5a7a" stroke-width="5" stroke-linecap="round"/>
+            <polygon points="94,50 100,42 103,55 97,60" fill="#CCC"/>
+            <g fill="#3a3a5a">
+              <rect x="29" y="113" width="9" height="15" rx="2" transform="rotate(-4,29,113)"/>
+              <rect x="40" y="113" width="9" height="15" rx="2"/>
+              <rect x="51" y="113" width="9" height="15" rx="2"/>
+              <rect x="62" y="113" width="9" height="15" rx="2" transform="rotate(4,62,113)"/>
+            </g>
+            <rect x="33" y="125" width="13" height="36" fill="#5a5a7a" rx="4"/>
+            <rect x="54" y="125" width="13" height="36" fill="#5a5a7a" rx="4"/>
+            <rect x="28" y="155" width="21" height="4" fill="#3a2a10"/>
+            <rect x="51" y="155" width="21" height="4" fill="#3a2a10"/>
+            <ellipse cx="39" cy="162" rx="14" ry="5" fill="#3a2a10"/>
+            <ellipse cx="61" cy="162" rx="14" ry="5" fill="#3a2a10"/>
+          </svg>
+        </div>
+        <div class="power-badge enemy-badge" id="enemy-badge">?</div>
+        <div class="fighter-name">RIVAL</div>
+      </div>
+    </div>
+
+    <!-- Question -->
+    <div class="question-area">
+      <div class="question-box">
+        <div class="question-text" id="question-text">Preparando batalla...</div>
+      </div>
+      <div class="answer-grid cols-2" id="answer-grid"></div>
+    </div>
+
+    <!-- Feedback overlay -->
+    <div id="feedback-overlay">
+      <div class="feedback-bubble" id="feedback-bubble">
+        <span class="feedback-icon" id="feedback-icon"></span>
+        <div class="feedback-text" id="feedback-text"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== COMPLETE ==================== -->
+  <div id="screen-complete" class="screen">
+    <div class="complete-card">
+      <div class="complete-icon" id="complete-icon">🏆</div>
+      <div class="complete-title" id="complete-title">¡Victoria!</div>
+      <div class="stars-row" id="complete-stars">
+        <span class="star-anim">⭐</span>
+        <span class="star-anim">⭐</span>
+        <span class="star-anim">⭐</span>
+      </div>
+      <div class="complete-score" id="complete-score">Puntos: 0</div>
+      <div class="complete-msg" id="complete-msg"></div>
+      <div class="btns-row">
+        <button class="btn-secondary" id="btn-retry">🔄 Repetir</button>
+        <button class="btn-primary" id="btn-continue">▶ Continuar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== GAME OVER ==================== -->
+  <div id="screen-gameover" class="screen">
+    <div class="complete-card">
+      <div class="complete-icon">💀</div>
+      <div class="complete-title" style="color:#e74c3c;">¡Derrota!</div>
+      <div class="complete-msg" id="gameover-msg">¡El gladiador ha caído! Practica más y vuelve a intentarlo.</div>
+      <div class="btns-row" style="margin-top:20px;">
+        <button class="btn-primary" id="btn-retry-go">🔄 Volver a intentar</button>
+        <button class="btn-secondary" id="btn-menu-go">🏛 Menú</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- #app -->
+
+<script>
+// ============================================================
+//  GLADIATOR ACADEMY  —  Game Engine
+// ============================================================
+
+// ---------- AUDIO (Web Audio API) ----------
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+function getAudio() {
+  if (!audioCtx) audioCtx = new AudioCtx();
+  return audioCtx;
+}
+function beep(freq, type, dur, vol = 0.3) {
+  try {
+    const ctx = getAudio();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = type; osc.frequency.value = freq;
+    gain.gain.setValueAtTime(vol, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + dur);
+  } catch(e) {}
+}
+const SFX = {
+  correct()  { beep(880, 'sine', 0.15); setTimeout(() => beep(1100, 'sine', 0.2), 100); },
+  wrong()    { beep(200, 'sawtooth', 0.3, 0.2); },
+  victory()  { [600,750,900,1100].forEach((f,i) => setTimeout(() => beep(f,'sine',0.2),i*100)); },
+  defeat()   { [400,320,250,180].forEach((f,i) => setTimeout(() => beep(f,'sawtooth',0.25,0.15),i*120)); },
+  click()    { beep(440, 'sine', 0.08, 0.15); },
+  star()     { beep(1200, 'sine', 0.15, 0.2); },
+};
+
+// ---------- SAVE/LOAD ----------
+const SAVE_KEY = 'gladiator_academy_v1';
+function loadSave() {
+  try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch(e) { return {}; }
+}
+function writeSave(data) {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch(e) {}
+}
+
+let save = loadSave();
+if (!save.unlocked) save.unlocked = 1;
+if (!save.stars) save.stars = { 1: 0, 2: 0, 3: 0 };
+
+// ---------- SCREEN MANAGER ----------
+const screens = ['menu','game','complete','gameover'];
+function showScreen(name) {
+  screens.forEach(s => {
+    const el = document.getElementById('screen-' + s);
+    el.classList.toggle('active', s === name);
+  });
+}
+
+// ---------- STATE ----------
+let currentLevel = 1;
+let hp = 3;
+let score = 0;
+let questionIndex = 0;
+let totalQuestions = 10;
+let questions = [];
+let currentQ = null;
+let awaitingNext = false;
+let orderSelected = []; // for order questions
+
+// ---------- MENU ----------
+function initMenu() {
+  updateMenuStars();
+  showScreen('menu');
+}
+
+function updateMenuStars() {
+  [1,2,3].forEach(lv => {
+    const btn = document.getElementById('btn-level-' + lv);
+    const starsEl = document.getElementById('stars-' + lv);
+    if (lv <= save.unlocked) {
+      btn.classList.remove('locked');
+      const s = save.stars[lv];
+      starsEl.textContent = (s >= 1 ? '⭐' : '☆') + (s >= 2 ? '⭐' : '☆') + (s >= 3 ? '⭐' : '☆');
+    } else {
+      btn.classList.add('locked');
+      starsEl.textContent = '🔒';
+    }
+  });
+}
+
+document.querySelectorAll('.level-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const lv = parseInt(btn.dataset.level);
+    if (lv > save.unlocked) { SFX.wrong(); return; }
+    SFX.click();
+    startLevel(lv);
+  });
+});
+
+document.getElementById('btn-back').addEventListener('click', () => {
+  SFX.click();
+  initMenu();
+});
+
+document.getElementById('btn-retry').addEventListener('click', () => {
+  SFX.click(); startLevel(currentLevel);
+});
+document.getElementById('btn-continue').addEventListener('click', () => {
+  SFX.click();
+  const next = currentLevel + 1;
+  if (next <= 3 && next <= save.unlocked) startLevel(next);
+  else initMenu();
+});
+document.getElementById('btn-retry-go').addEventListener('click', () => {
+  SFX.click(); startLevel(currentLevel);
+});
+document.getElementById('btn-menu-go').addEventListener('click', () => {
+  SFX.click(); initMenu();
+});
+
+// ============================================================
+//  QUESTION GENERATORS
+// ============================================================
+
+// --- LEVEL 1: NUMBERS ---
+function getRange(qIndex, total) {
+  const pct = qIndex / total;
+  if (pct < 0.3) return [1, 20];
+  if (pct < 0.6) return [1, 50];
+  return [1, 100];
+}
+function randInt(a, b) { return Math.floor(Math.random() * (b - a + 1)) + a; }
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function makeL1Question(idx, total) {
+  const [lo, hi] = getRange(idx, total);
+  const type = randInt(0, 4);
+
+  if (type === 0) {
+    // Which is bigger? (2 numbers)
+    let a = randInt(lo, hi), b;
+    do { b = randInt(lo, hi); } while (b === a);
+    const bigger = Math.max(a, b);
+    const opts = shuffle([a, b]);
+    return {
+      type: 'choose',
+      playerPower: a, enemyPower: b,
+      text: `¿Cuál número es <span class="question-highlight">mayor</span>?`,
+      options: opts.map(v => ({ label: String(v), value: v })),
+      correct: bigger,
+      cols: 2,
+    };
+  }
+  if (type === 1) {
+    // Which is smaller? (2 numbers)
+    let a = randInt(lo, hi), b;
+    do { b = randInt(lo, hi); } while (b === a);
+    const smaller = Math.min(a, b);
+    const opts = shuffle([a, b]);
+    return {
+      type: 'choose',
+      playerPower: a, enemyPower: b,
+      text: `¿Cuál número es <span class="question-highlight">menor</span>?`,
+      options: opts.map(v => ({ label: String(v), value: v })),
+      correct: smaller,
+      cols: 2,
+    };
+  }
+  if (type === 2) {
+    // Can you defeat the enemy? (yes/no)
+    let a = randInt(lo, hi), b;
+    do { b = randInt(lo, hi); } while (b === a);
+    const canWin = a > b;
+    return {
+      type: 'choose',
+      playerPower: a, enemyPower: b,
+      text: `Tu poder es <span class="question-highlight">${a}</span>. El rival tiene <span class="question-highlight">${b}</span>. ¿Puedes vencerlo?`,
+      options: [{ label: '⚔ ¡SÍ, ATACA!', value: 'si' }, { label: '🛡 ¡NO, HUYE!', value: 'no' }],
+      correct: canWin ? 'si' : 'no',
+      cols: 2,
+    };
+  }
+  if (type === 3) {
+    // Pick the biggest among 3
+    const nums = [];
+    while (nums.length < 3) {
+      const n = randInt(lo, hi);
+      if (!nums.includes(n)) nums.push(n);
+    }
+    const biggest = Math.max(...nums);
+    const opts = shuffle(nums);
+    return {
+      type: 'choose',
+      playerPower: opts[0], enemyPower: opts[1],
+      text: `¿Cuál es el número <span class="question-highlight">más grande</span>?`,
+      options: opts.map(v => ({ label: String(v), value: v })),
+      correct: biggest,
+      cols: 2,
+    };
+  }
+  // type === 4: order 3 numbers ascending
+  const nums = [];
+  while (nums.length < 3) {
+    const n = randInt(lo, hi);
+    if (!nums.includes(n)) nums.push(n);
+  }
+  const sorted = [...nums].sort((a, b) => a - b);
+  const displayed = shuffle(nums);
+  return {
+    type: 'order',
+    playerPower: nums[0], enemyPower: nums[1],
+    text: `Ordena de <span class="question-highlight">menor a mayor</span>. Toca en orden:`,
+    options: displayed.map(v => ({ label: String(v), value: v })),
+    correct: sorted,
+    cols: 2,
+  };
+}
+
+// --- LEVEL 2: LETTERS ---
+const VOWELS = ['A','E','I','O','U'];
+const CONSONANTS = ['B','C','D','F','G','H','J','K','L','M','N','Ñ','P','Q','R','S','T','V','W','X','Y','Z'];
+const SPANISH_WORDS = [
+  'ROMA','GATO','LUNA','CASA','PERA','MESA','LIBRO','ARENA','ARMA',
+  'LEON','ROBLE','CIUDAD','CAMPO','FUEGO','AGUA','HIERRO','ORO',
+  'LOBO','NUBE','ISLA','PLUMA','VIENTO','ROCA','TORRE',
+];
+
+function makeL2Question(idx, total) {
+  const pct = idx / total;
+  // First third: classify single letter
+  // Second third: classify single letter (harder: use full alphabet)
+  // Last third: word - tap all vowels
+  if (pct < 0.5) {
+    const all = [...VOWELS, ...CONSONANTS];
+    const letter = all[randInt(0, all.length - 1)];
+    const isVowel = VOWELS.includes(letter);
+    return {
+      type: 'classify',
+      playerPower: '?', enemyPower: '?',
+      letter,
+      text: `La letra <span class="question-highlight">${letter}</span> es...`,
+      options: [
+        { label: '🔵 VOCAL', value: 'vocal' },
+        { label: '🔴 CONSONANTE', value: 'consonante' },
+      ],
+      correct: isVowel ? 'vocal' : 'consonante',
+      cols: 2,
+    };
+  }
+  // Word - tap all vowels
+  const word = SPANISH_WORDS[randInt(0, SPANISH_WORDS.length - 1)];
+  const vowelPositions = [...word].map((c, i) => VOWELS.includes(c) ? i : -1).filter(i => i >= 0);
+  return {
+    type: 'word-vowels',
+    playerPower: '?', enemyPower: '?',
+    word,
+    vowelPositions,
+    text: `Toca todas las <span class="question-highlight">vocales</span> de la palabra:`,
+  };
+}
+
+// --- LEVEL 3: MATH ---
+function getMathRange(idx, total) {
+  const pct = idx / total;
+  if (pct < 0.3) return 10;
+  if (pct < 0.65) return 20;
+  return 50;
+}
+function makeL3Question(idx, total) {
+  const max = getMathRange(idx, total);
+  const type = randInt(0, 1); // 0=sum, 1=sub
+  if (type === 0) {
+    const a = randInt(1, Math.floor(max * 0.7));
+    const b = randInt(1, max - a);
+    const result = a + b;
+    const wrong1 = result + randInt(1, 5);
+    const wrong2 = Math.max(1, result - randInt(1, 5));
+    const wrong3 = result + randInt(6, 12);
+    const opts = shuffle([result, wrong1, wrong2, wrong3].filter((v,i,a) => a.indexOf(v) === i).slice(0,4));
+    while (opts.length < 4) opts.push(result + opts.length * 3);
+    return {
+      type: 'choose',
+      playerPower: a, enemyPower: b,
+      text: `<span class="question-highlight">${a} + ${b}</span> = ?<br><small style="color:#c8a060;font-size:0.75em">¡Suma tus poderes para atacar!</small>`,
+      options: shuffle([result, wrong1, wrong2, wrong3]).map(v => ({ label: String(v), value: v })),
+      correct: result,
+      cols: 4,
+    };
+  } else {
+    const a = randInt(Math.floor(max * 0.3), max);
+    const b = randInt(1, a);
+    const result = a - b;
+    const wrong1 = result + randInt(1, 5);
+    const wrong2 = Math.max(0, result - randInt(1, 5));
+    const wrong3 = result + randInt(6, 11);
+    return {
+      type: 'choose',
+      playerPower: a, enemyPower: b,
+      text: `<span class="question-highlight">${a} − ${b}</span> = ?<br><small style="color:#c8a060;font-size:0.75em">¡Resta para conocer tu fuerza!</small>`,
+      options: shuffle([result, wrong1, wrong2, wrong3]).map(v => ({ label: String(v), value: v })),
+      correct: result,
+      cols: 4,
+    };
+  }
+}
+
+// ============================================================
+//  GAME FLOW
+// ============================================================
+function startLevel(lv) {
+  currentLevel = lv;
+  hp = 3;
+  score = 0;
+  questionIndex = 0;
+  awaitingNext = false;
+  orderSelected = [];
+  totalQuestions = lv === 2 ? 15 : 10;
+
+  // Build question list
+  questions = [];
+  for (let i = 0; i < totalQuestions; i++) {
+    if (lv === 1) questions.push(makeL1Question(i, totalQuestions));
+    else if (lv === 2) questions.push(makeL2Question(i, totalQuestions));
+    else questions.push(makeL3Question(i, totalQuestions));
+  }
+
+  const labels = ['', 'Nivel I · La Arena de los Números', 'Nivel II · El Coliseo de las Letras', 'Nivel III · El Imperio Matemático'];
+  document.getElementById('level-label').textContent = labels[lv];
+
+  updateHPDisplay();
+  updateScore(0);
+  showScreen('game');
+  loadQuestion();
+}
+
+function loadQuestion() {
+  if (questionIndex >= totalQuestions) { endLevel(); return; }
+  awaitingNext = false;
+  orderSelected = [];
+  currentQ = questions[questionIndex];
+  document.getElementById('q-current').textContent = questionIndex + 1;
+  document.getElementById('q-total').textContent = totalQuestions;
+  document.getElementById('question-text').innerHTML = currentQ.text;
+
+  // Badges
+  document.getElementById('player-badge').textContent = currentQ.playerPower;
+  document.getElementById('enemy-badge').textContent = currentQ.enemyPower;
+
+  // Reset anim
+  const pw = document.getElementById('player-wrap');
+  const ew = document.getElementById('enemy-wrap');
+  pw.classList.remove('player-attack','got-hit');
+  ew.classList.remove('enemy-attack','got-hit');
+
+  // Hide feedback
+  const fb = document.getElementById('feedback-bubble');
+  fb.classList.remove('show','correct-fb','wrong-fb');
+
+  renderAnswers();
+}
+
+function renderAnswers() {
+  const grid = document.getElementById('answer-grid');
+  grid.innerHTML = '';
+  grid.className = 'answer-grid';
+
+  if (currentQ.type === 'word-vowels') {
+    renderWordQuestion(grid);
+    return;
+  }
+  if (currentQ.type === 'order') {
+    renderOrderQuestion(grid);
+    return;
+  }
+  // Standard choose
+  const cols = currentQ.cols || 2;
+  grid.classList.add(cols === 4 ? 'cols-4' : 'cols-2');
+  currentQ.options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'answer-btn';
+    if (opt.value === 'si') btn.classList.add('yes-btn');
+    if (opt.value === 'no') btn.classList.add('no-btn');
+    // Long text gets smaller font
+    if (String(opt.label).length > 4) btn.classList.add('small-text');
+    btn.innerHTML = opt.label;
+    btn.addEventListener('click', () => handleAnswer(opt.value, btn));
+    grid.appendChild(btn);
+  });
+}
+
+function renderWordQuestion(grid) {
+  grid.classList.add('cols-1');
+  // Word letter buttons
+  const wordRow = document.createElement('div');
+  wordRow.className = 'word-display';
+  const word = currentQ.word;
+  const vowelPositions = currentQ.vowelPositions;
+  let foundVowels = new Set();
+
+  [...word].forEach((ch, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'word-letter-btn';
+    btn.textContent = ch;
+    btn.dataset.index = i;
+    btn.addEventListener('click', () => {
+      if (awaitingNext) return;
+      if (VOWELS.includes(ch)) {
+        if (!foundVowels.has(i)) {
+          foundVowels.add(i);
+          btn.classList.add('vowel-found');
+          SFX.correct();
+          // Check if all vowels found
+          if (foundVowels.size === vowelPositions.length) {
+            updateScore(score + 10);
+            animateFighters(true);
+            setTimeout(() => {
+              questionIndex++;
+              loadQuestion();
+            }, 900);
+          }
+        }
+      } else {
+        btn.classList.add('wrong-pick');
+        SFX.wrong();
+        loseHP();
+        setTimeout(() => btn.classList.remove('wrong-pick'), 500);
+      }
+    });
+    wordRow.appendChild(btn);
+  });
+  grid.appendChild(wordRow);
+
+  // Hint
+  const hint = document.createElement('div');
+  hint.className = 'order-instructions';
+  hint.textContent = `Hay ${vowelPositions.length} vocal${vowelPositions.length !== 1 ? 'es' : ''} en esta palabra`;
+  grid.appendChild(hint);
+}
+
+function renderOrderQuestion(grid) {
+  grid.classList.add('cols-2');
+  // Buttons to tap
+  const nums = currentQ.options;
+  const correct = currentQ.correct; // sorted array
+  let tapped = [];
+  const resultSlots = [];
+
+  // Result display
+  const resultRow = document.createElement('div');
+  resultRow.className = 'order-result';
+  correct.forEach(() => {
+    const slot = document.createElement('div');
+    slot.className = 'order-slot';
+    slot.textContent = '?';
+    resultRow.appendChild(slot);
+    resultSlots.push(slot);
+  });
+  grid.appendChild(resultRow);
+
+  const hint = document.createElement('div');
+  hint.className = 'order-instructions';
+  hint.textContent = 'Toca los números en orden: menor → mayor';
+  grid.appendChild(hint);
+
+  nums.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'answer-btn';
+    btn.textContent = opt.label;
+    btn.dataset.val = opt.value;
+    btn.addEventListener('click', () => {
+      if (awaitingNext) return;
+      if (btn.classList.contains('order-selected') || btn.classList.contains('order-correct')) return;
+      const expected = correct[tapped.length];
+      if (opt.value === expected) {
+        tapped.push(opt.value);
+        btn.classList.add('order-selected');
+        SFX.correct();
+        const slot = resultSlots[tapped.length - 1];
+        slot.textContent = opt.value;
+        slot.classList.add('filled');
+        if (tapped.length === correct.length) {
+          // All correct
+          btn.classList.remove('order-selected');
+          btn.classList.add('order-correct');
+          grid.querySelectorAll('.answer-btn.order-selected').forEach(b => b.classList.add('order-correct'));
+          updateScore(score + 10);
+          animateFighters(true);
+          showFeedback(true, '¡Orden correcto!');
+          awaitingNext = true;
+          setTimeout(() => { questionIndex++; loadQuestion(); }, 1100);
+        }
+      } else {
+        btn.classList.add('wrong');
+        SFX.wrong();
+        loseHP();
+        setTimeout(() => btn.classList.remove('wrong'), 500);
+        // Reset
+        tapped = [];
+        resultSlots.forEach(s => { s.textContent = '?'; s.classList.remove('filled'); });
+        grid.querySelectorAll('.answer-btn.order-selected').forEach(b => b.classList.remove('order-selected'));
+      }
+    });
+    grid.appendChild(btn);
+  });
+}
+
+function handleAnswer(value, btn) {
+  if (awaitingNext) return;
+  awaitingNext = true;
+  const isCorrect = value === currentQ.correct;
+
+  // Visual feedback on button
+  btn.classList.add(isCorrect ? 'correct' : 'wrong');
+  // Highlight correct if wrong
+  if (!isCorrect) {
+    document.querySelectorAll('.answer-btn').forEach(b => {
+      if ((b.textContent == currentQ.correct) || (b.dataset && b.dataset.value == currentQ.correct)) {
+        b.classList.add('correct');
+      }
+    });
+  }
+
+  if (isCorrect) {
+    SFX.correct();
+    updateScore(score + 10);
+    animateFighters(true);
+    showFeedback(true, randomCorrectMsg());
+  } else {
+    SFX.wrong();
+    loseHP();
+    animateFighters(false);
+    showFeedback(false, randomWrongMsg());
+  }
+
+  setTimeout(() => { questionIndex++; loadQuestion(); }, 1100);
+}
+
+function showFeedback(correct, text) {
+  const bubble = document.getElementById('feedback-bubble');
+  document.getElementById('feedback-icon').textContent = correct ? '✅' : '❌';
+  document.getElementById('feedback-text').textContent = text;
+  bubble.className = 'feedback-bubble ' + (correct ? 'correct-fb' : 'wrong-fb');
+  setTimeout(() => bubble.classList.add('show'), 10);
+}
+
+function animateFighters(playerWins) {
+  const pw = document.getElementById('player-wrap');
+  const ew = document.getElementById('enemy-wrap');
+  if (playerWins) {
+    pw.classList.add('player-attack');
+    ew.classList.add('got-hit');
+  } else {
+    ew.classList.add('enemy-attack');
+    pw.classList.add('got-hit');
+  }
+}
+
+function loseHP() {
+  if (hp > 0) {
+    hp--;
+    updateHPDisplay();
+    if (hp === 0) {
+      setTimeout(() => {
+        SFX.defeat();
+        showScreen('gameover');
+      }, 1200);
+    }
+  }
+}
+
+function updateHPDisplay() {
+  for (let i = 1; i <= 3; i++) {
+    const heart = document.getElementById('hp' + i);
+    heart.classList.toggle('lost', i > hp);
+  }
+}
+
+function updateScore(s) {
+  score = s;
+  document.getElementById('score-display').textContent = score;
+}
+
+function randomCorrectMsg() {
+  const msgs = ['¡Correcto!','¡Excelente!','¡Magnífico!','¡Muy bien!','¡Gladiador poderoso!','¡Ave Caesar!','¡Gloria!'];
+  return msgs[randInt(0, msgs.length - 1)];
+}
+function randomWrongMsg() {
+  const msgs = ['¡Incorrecto!','¡Intenta de nuevo!','¡El rival ataca!','¡Cuidado!','¡Sigue practicando!'];
+  return msgs[randInt(0, msgs.length - 1)];
+}
+
+// ============================================================
+//  LEVEL END
+// ============================================================
+function endLevel() {
+  const stars = hp >= 3 ? 3 : hp >= 2 ? 2 : hp >= 1 ? 1 : 0;
+  // Save progress
+  if (stars > 0) {
+    if (stars > (save.stars[currentLevel] || 0)) save.stars[currentLevel] = stars;
+    if (currentLevel === save.unlocked && currentLevel < 3) save.unlocked = currentLevel + 1;
+    writeSave(save);
+  }
+
+  const icon = stars >= 3 ? '🏆' : stars >= 2 ? '🥇' : stars >= 1 ? '🎖️' : '💔';
+  const title = stars > 0 ? '¡Victoria!' : '¡Derrota!';
+  const msgs = {
+    3: '¡Perfecto! ¡Eres el gladiador más poderoso del Imperio!',
+    2: '¡Bien hecho! ¡Roma está orgullosa de ti!',
+    1: '¡Lo lograste! Sigue entrenando para llegar a la perfección.',
+    0: '¡El gladiador ha caído! Vuelve a intentarlo.',
+  };
+
+  document.getElementById('complete-icon').textContent = icon;
+  document.getElementById('complete-title').textContent = title;
+  document.getElementById('complete-score').textContent = `Puntos obtenidos: ${score}`;
+  document.getElementById('complete-msg').textContent = msgs[stars];
+
+  // Stars
+  const starsEl = document.getElementById('complete-stars');
+  starsEl.innerHTML = '';
+  for (let i = 1; i <= 3; i++) {
+    const span = document.createElement('span');
+    span.className = 'star-anim';
+    span.textContent = i <= stars ? '⭐' : '☆';
+    starsEl.appendChild(span);
+  }
+
+  // Continue button visibility
+  const cont = document.getElementById('btn-continue');
+  const hasNext = currentLevel < 3 && save.unlocked > currentLevel;
+  cont.style.display = hasNext ? 'inline-block' : 'none';
+
+  SFX.victory();
+  showScreen('complete');
+}
+
+// ============================================================
+//  BOOT
+// ============================================================
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+initMenu();
+</script>
+</body>
+</html>
