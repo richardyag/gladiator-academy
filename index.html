@@ -425,6 +425,45 @@
     .enemy-attack  { animation: attackLeft  0.4s ease; }
     .got-hit       { animation: hitShake    0.4s ease; }
 
+    /* ===================== LEVEL 2 DYNAMIC ===================== */
+    @keyframes slideInEnemy {
+      from { transform: translateX(120px); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
+    }
+    .slide-in-enemy { animation: slideInEnemy 0.45s cubic-bezier(0.22,1,0.36,1); }
+
+    @keyframes letterPop {
+      0%   { transform: scale(0.3) rotate(-15deg); opacity: 0; }
+      60%  { transform: scale(1.2) rotate(4deg);  opacity: 1; }
+      100% { transform: scale(1)   rotate(0deg);  opacity: 1; }
+    }
+    @keyframes badgeGlow {
+      from { box-shadow: 0 0 8px rgba(220,80,80,0.5); }
+      to   { box-shadow: 0 0 28px rgba(220,80,80,1), 0 0 8px rgba(255,200,200,0.4); }
+    }
+    .power-badge.letter-mode {
+      font-size: 28px; width: 62px; height: 62px;
+      animation: badgeGlow 0.9s ease-in-out infinite alternate;
+    }
+    /* big letter in question box */
+    .mystery-big {
+      font-size: clamp(64px, 19vw, 90px); font-weight: bold;
+      color: var(--cream); line-height: 1; text-align: center;
+      animation: letterPop 0.4s cubic-bezier(0.22,1,0.36,1);
+      text-shadow: 0 0 30px rgba(255,255,255,0.2), 2px 3px 0 #000;
+    }
+    /* vowel tiles glow when it's a match */
+    @keyframes vowelPulse {
+      0%,100% { background: rgba(212,168,83,0.25); }
+      50%     { background: rgba(212,168,83,0.55); box-shadow: 0 0 12px rgba(212,168,83,0.5); }
+    }
+    .vref.pulse { animation: vowelPulse 0.8s ease-in-out 3; }
+    /* icon buttons bigger for L2 */
+    .answer-btn.battle-btn {
+      font-size: 48px; min-height: 80px; flex-direction: column; gap: 4px;
+    }
+    .battle-btn-label { font-size: 11px; color: rgba(255,255,255,0.7); letter-spacing: 1px; }
+
     /* Torch decoration */
     .torch-row {
       display: flex; justify-content: space-between;
@@ -601,7 +640,7 @@
       </div>
 
       <!-- Enemy -->
-      <div class="fighter-col">
+      <div class="fighter-col" id="enemy-col">
         <div class="fighter-svg-wrap enemy" id="enemy-wrap">
           <svg viewBox="0 0 100 180" xmlns="http://www.w3.org/2000/svg" id="enemy-svg">
             <!-- Enemy: dark armor, orange plume -->
@@ -875,15 +914,18 @@ function makeL1Question(idx, total) {
   }
 }
 
-// --- LEVEL 2: VOWELS (visual reference, no reading needed) ---
+// --- LEVEL 2: VOWELS (enemy runs in carrying a letter) ---
 function makeL2Question(idx, total) {
   const all = [...VOWELS, ...CONSONANTS];
   const letter = all[randInt(0, all.length - 1)];
+  const isVowel = VOWELS.includes(letter);
   return {
     type: 'vowel-check',
     letter,
-    correct: VOWELS.includes(letter) ? 'si' : 'no',
-    playerPower: '?', enemyPower: '?',
+    isVowel,
+    correct: isVowel ? 'attack' : 'flee',
+    playerPower: '?',
+    enemyPower: letter,   // shown on enemy badge
   };
 }
 
@@ -953,6 +995,9 @@ function loadQuestion() {
   document.getElementById('player-wrap').classList.remove('player-attack','got-hit');
   document.getElementById('enemy-wrap').classList.remove('enemy-attack','got-hit');
   document.getElementById('feedback-bubble').classList.remove('show','correct-fb','wrong-fb');
+  // Reset Level 2 specific styles
+  document.getElementById('enemy-badge').classList.remove('letter-mode');
+  document.getElementById('enemy-col').classList.remove('slide-in-enemy');
 
   // Set question content based on type
   const qt = document.getElementById('question-text');
@@ -968,8 +1013,15 @@ function loadQuestion() {
          <div style="text-align:center">${dotsHTML(currentQ.enemyNum,'#e74c3c')}<div style="font-size:11px;color:#c8a060;margin-top:2px">RIVAL</div></div>
        </div>`;
   } else if (currentQ.type === 'vowel-check') {
+    // Enemy slides in carrying the mystery letter
+    const ec = document.getElementById('enemy-col');
+    ec.classList.remove('slide-in-enemy');
+    void ec.offsetWidth; // reflow
+    ec.classList.add('slide-in-enemy');
+    // Badge shows the letter, big and glowing
+    document.getElementById('enemy-badge').classList.add('letter-mode');
     qt.innerHTML =
-      `<div class="vowel-ref-row">${VOWELS.map(v=>`<div class="vref">${v}</div>`).join('')}</div>
+      `<div class="vowel-ref-row" id="vowel-ref-row">${VOWELS.map(v=>`<div class="vref" data-v="${v}">${v}</div>`).join('')}</div>
        <div class="mystery-big">${currentQ.letter}</div>`;
   } else if (currentQ.type === 'visual-add') {
     qt.innerHTML =
@@ -1019,13 +1071,23 @@ function renderCanWin(grid) {
   });
 }
 
-// Level 2 – is it a vowel? tap ✅ or ❌
+// Level 2 – enemy runs in with a letter; ⚔️ = vowel (attack), 🛡️ = consonant (flee)
 function renderVowelCheck(grid) {
   grid.classList.add('cols-2');
-  [['si','✅','yes-btn'],['no','❌','no-btn']].forEach(([val, icon, cls]) => {
+
+  // Pulse the matching vowel tile after a short delay
+  setTimeout(() => {
+    if (!currentQ) return;
+    if (currentQ.isVowel) {
+      const tile = document.querySelector(`#vowel-ref-row [data-v="${currentQ.letter}"]`);
+      if (tile) tile.classList.add('pulse');
+    }
+  }, 600);
+
+  [['attack','⚔️','Vocal','yes-btn'],['flee','🛡️','No vocal','no-btn']].forEach(([val, icon, label, cls]) => {
     const btn = document.createElement('button');
-    btn.className = `answer-btn icon-btn ${cls}`;
-    btn.innerHTML = icon;
+    btn.className = `answer-btn battle-btn ${cls}`;
+    btn.innerHTML = `${icon}<span class="battle-btn-label">${label}</span>`;
     btn.addEventListener('click', () => handleAnswer(val, btn));
     grid.appendChild(btn);
   });
